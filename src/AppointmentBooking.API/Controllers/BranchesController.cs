@@ -42,6 +42,12 @@ public class BranchesController : ControllerBase
     public async Task<ActionResult<IEnumerable<AvailableSlotDto>>> GetAvailableSlots(
         int id, [FromQuery] int serviceId, [FromQuery] DateTime date)
     {
+        if (serviceId <= 0)
+            return BadRequest(new { message = "Invalid serviceId" });
+            
+        if (date == default)
+            return BadRequest(new { message = "Invalid date" });
+            
         var slots = await _availabilityService.GetAvailableSlotsAsync(id, serviceId, date);
         return Ok(slots);
     }
