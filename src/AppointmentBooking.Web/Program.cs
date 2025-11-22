@@ -7,6 +7,7 @@ using AppointmentBooking.Core.Interfaces;
 using AppointmentBooking.Infrastructure.Data;
 using AppointmentBooking.Infrastructure.Repositories;
 using FluentValidation;
+using FluentValidation.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,6 +23,7 @@ builder.Services.AddAutoMapper(typeof(AutoMapperProfile));
 
 // FluentValidation
 builder.Services.AddValidatorsFromAssemblyContaining<CreateAppointmentValidator>();
+builder.Services.AddFluentValidationAutoValidation();
 
 // Repositories
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
