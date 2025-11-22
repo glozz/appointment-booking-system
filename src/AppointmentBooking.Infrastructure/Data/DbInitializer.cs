@@ -119,6 +119,8 @@ public static class DbInitializer
         context.Branches.AddRange(branches);
         context.SaveChanges();
 
+        // After SaveChanges, the branches array will have their generated IDs populated by EF Core
+        
         // Seed Operating Hours
         // Monday-Friday: 9:00 AM - 5:00 PM
         // Saturday: 9:00 AM - 1:00 PM
@@ -164,6 +166,8 @@ public static class DbInitializer
         context.BranchOperatingHours.AddRange(operatingHours);
         context.SaveChanges();
 
+        // After SaveChanges, both branches and services arrays have their generated IDs populated by EF Core
+        
         // Seed BranchServices (all branches offer all services)
         var branchServices = new List<BranchService>();
         
