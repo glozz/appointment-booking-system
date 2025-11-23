@@ -1,0 +1,86 @@
+@model HomeViewModel
+@{
+    ViewData["Title"] = "Home";
+}
+
+<div class="hero">
+    <div class="container text-center">
+        <h1 class="display-4 mb-3"><i class="bi bi-calendar-check"></i> Welcome to Appointment Booking</h1>
+        <p class="lead mb-4">Book your bank appointment in just a few clicks</p>
+        <a asp-controller="Appointments" asp-action="Book" class="btn btn-light btn-lg">
+            <i class="bi bi-calendar-plus"></i> Book Now
+        </a>
+        <a asp-controller="Appointments" asp-action="Lookup" class="btn btn-outline-light btn-lg ms-2">
+            <i class="bi bi-search"></i> Lookup Appointment
+        </a>
+    </div>
+</div>
+
+<div class="container my-5">
+    <div class="row">
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h3 class="card-title"><i class="bi bi-building text-primary"></i> Our Branches</h3>
+                    <p class="card-text">We have @Model.Branches.Count() branches ready to serve you.</p>
+                    <ul class="list-unstyled">
+                        @foreach (var branch in Model.Branches.Take(4))
+                        {
+                            <li class="mb-2">
+                                <i class="bi bi-geo-alt-fill text-primary"></i> 
+                                <strong>@branch.Name</strong> - @branch.City
+                            </li>
+                        }
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h3 class="card-title"><i class="bi bi-list-check text-success"></i> Our Services</h3>
+                    <p class="card-text">We offer @Model.Services.Count() banking services.</p>
+                    <ul class="list-unstyled">
+                        @foreach (var service in Model.Services.Take(7))
+                        {
+                            <li class="mb-2">
+                                <i class="bi bi-check-circle-fill text-success"></i> 
+                                <strong>@service.Name</strong> (@service.DurationMinutes min)
+                            </li>
+                        }
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-4 mb-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <i class="bi bi-clock-history display-4 text-primary"></i>
+                    <h5 class="card-title mt-3">Easy Scheduling</h5>
+                    <p class="card-text">Book appointments 24/7 online at your convenience</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <i class="bi bi-shield-check display-4 text-success"></i>
+                    <h5 class="card-title mt-3">Instant Confirmation</h5>
+                    <p class="card-text">Get your confirmation code immediately after booking</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <i class="bi bi-calendar-x display-4 text-warning"></i>
+                    <h5 class="card-title mt-3">Easy Cancellation</h5>
+                    <p class="card-text">Cancel or reschedule appointments hassle-free</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
