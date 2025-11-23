@@ -1,0 +1,88 @@
+@model AppointmentDto
+@{
+    ViewData["Title"] = "Appointment Details";
+}
+
+<div class="container my-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h2><i class="bi bi-calendar-event"></i> Appointment Details</h2>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <strong>Confirmation Code:</strong> @Model.ConfirmationCode
+                    </div>
+
+                    <table class="table">
+                        <tr>
+                            <th width="30%">Date:</th>
+                            <td>@Model.AppointmentDate.ToString("MMMM dd, yyyy")</td>
+                        </tr>
+                        <tr>
+                            <th>Time:</th>
+                            <td>@Model.StartTime.ToString(@"HH\:mm") - @Model.EndTime.ToString(@"HH\:mm")</td>
+                        </tr>
+                        <tr>
+                            <th>Branch:</th>
+                            <td>@Model.Branch?.Name - @Model.Branch?.City</td>
+                        </tr>
+                        <tr>
+                            <th>Service:</th>
+                            <td>@Model.Service?.Name</td>
+                        </tr>
+                        <tr>
+                            <th>Status:</th>
+                            <td>
+                                @if (Model.Status == AppointmentBooking.Core.Enums.AppointmentStatus.Confirmed)
+                                {
+                                    <span class="badge bg-success">Confirmed</span>
+                                }
+                                else if (Model.Status == AppointmentBooking.Core.Enums.AppointmentStatus.Cancelled)
+                                {
+                                    <span class="badge bg-danger">Cancelled</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">@Model.Status</span>
+                                }
+                            </td>
+                        </tr>
+                        @if (!string.IsNullOrEmpty(Model.Notes))
+                        {
+                            <tr>
+                                <th>Notes:</th>
+                                <td>@Model.Notes</td>
+                            </tr>
+                        }
+                    </table>
+
+                    @if (Model.Status == AppointmentBooking.Core.Enums.AppointmentStatus.Confirmed)
+                    {
+                        <hr class="my-4" />
+                        <h5>Cancel Appointment</h5>
+                        <form asp-action="Cancel" method="post" onsubmit="return confirm('Are you sure you want to cancel this appointment?');">
+                            <input type="hidden" name="id" value="@Model.Id" />
+                            <div class="mb-3">
+                                <label for="reason" class="form-label">Cancellation Reason</label>
+                                <textarea name="reason" class="form-control" rows="2" required placeholder="Please provide a reason for cancellation"></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-danger">
+                                <i class="bi bi-x-circle"></i> Cancel Appointment
+                            </button>
+                        </form>
+                    }
+                    else
+                    {
+                        <div class="d-grid mt-4">
+                            <a asp-controller="Home" asp-action="Index" class="btn btn-primary">
+                                <i class="bi bi-house"></i> Back to Home
+                            </a>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
