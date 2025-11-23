@@ -1,0 +1,47 @@
+@model AppointmentDto
+@{
+    ViewData["Title"] = "Booking Confirmed";
+}
+
+<div class="container my-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card border-success">
+                <div class="card-header bg-success text-white text-center">
+                    <h2><i class="bi bi-check-circle"></i> Appointment Confirmed!</h2>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-success text-center">
+                        <h3>Confirmation Code</h3>
+                        <h1 class="display-4">@Model.ConfirmationCode</h1>
+                        <p class="mb-0">Please save this code</p>
+                    </div>
+
+                    <h4 class="mt-4">Details</h4>
+                    <table class="table">
+                        <tr>
+                            <th width="30%">Date:</th>
+                            <td>@Model.AppointmentDate.ToString("MMMM dd, yyyy")</td>
+                        </tr>
+                        <tr>
+                            <th>Time:</th>
+                            <td>@Model.StartTime.ToString(@"hh\:mm") - @Model.EndTime.ToString(@"hh\:mm")</td>
+                        </tr>
+                        <tr>
+                            <th>Branch:</th>
+                            <td>@Model.Branch?.Name</td>
+                        </tr>
+                        <tr>
+                            <th>Service:</th>
+                            <td>@Model.Service?.Name</td>
+                        </tr>
+                    </table>
+
+                    <div class="d-grid mt-4">
+                        <a asp-controller="Home" asp-action="Index" class="btn btn-primary">Back to Home</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
