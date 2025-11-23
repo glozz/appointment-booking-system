@@ -18,115 +18,128 @@ public static class DbInitializer
             return; // Database already seeded
         }
 
-        // Seed Services (7 banking services)
-        var services = new[]
-        {
-            new Service 
-            { 
-                Name = "Account Opening", 
-                Description = "Open a new checking or savings account", 
-                DurationMinutes = 30, 
-                IsActive = true 
-            },
-            new Service 
-            { 
-                Name = "Loan Consultation", 
-                Description = "Discuss personal or business loan options", 
-                DurationMinutes = 45, 
-                IsActive = true 
-            },
-            new Service 
-            { 
-                Name = "Credit Card Application", 
-                Description = "Apply for a new credit card", 
-                DurationMinutes = 30, 
-                IsActive = true 
-            },
-            new Service 
-            { 
-                Name = "Mortgage Consultation", 
-                Description = "Discuss home mortgage options and pre-approval", 
-                DurationMinutes = 60, 
-                IsActive = true 
-            },
-            new Service 
-            { 
-                Name = "Investment Advisory", 
-                Description = "Financial planning and investment portfolio review", 
-                DurationMinutes = 60, 
-                IsActive = true 
-            },
-            new Service 
-            { 
-                Name = "Safe Deposit Box", 
-                Description = "Rent or access your safe deposit box", 
-                DurationMinutes = 15, 
-                IsActive = true 
-            },
-            new Service 
-            { 
-                Name = "Foreign Exchange", 
-                Description = "Currency exchange and international banking services", 
-                DurationMinutes = 20, 
-                IsActive = true 
-            }
-        };
-        
+    //Seed Services (banking services)
+    var services = new[]
+    {
+    new Service
+    {
+        Name = "New Account Application",
+        Description = "Open a Capitec Global One account",
+        DurationMinutes = 25,
+        IsActive = true
+    },
+    new Service
+    {
+        Name = "Card Replacement",
+        Description = "Replace a lost, stolen, or damaged Capitec card",
+        DurationMinutes = 15,
+        IsActive = true
+    },
+    new Service
+    {
+        Name = "Personal Loan Application",
+        Description = "Apply for or enquire about a Capitec personal loan",
+        DurationMinutes = 40,
+        IsActive = true
+    },
+    new Service
+    {
+        Name = "Credit Limit Increase",
+        Description = "Apply for a credit facility or adjust your credit limit",
+        DurationMinutes = 30,
+        IsActive = true
+    },
+    new Service
+    {
+        Name = "Bank Statement & Confirmation Letter",
+        Description = "Request printed statements or bank confirmation letters",
+        DurationMinutes = 10,
+        IsActive = true
+    },
+    new Service
+    {
+        Name = "Biometric Verification",
+        Description = "Perform fingerprint or facial verification services",
+        DurationMinutes = 10,
+        IsActive = true
+    },
+    new Service
+    {
+        Name = "Debit Order Dispute",
+        Description = "Query or reverse an unauthorised debit order",
+        DurationMinutes = 20,
+        IsActive = true
+    },
+    new Service
+    {
+        Name = "FICA Document Update",
+        Description = "Update address or identification documents",
+        DurationMinutes = 15,
+        IsActive = true
+    },
+    new Service
+    {
+        Name = "Account Enquiries",
+        Description = "General enquiries about your Global One account",
+        DurationMinutes = 15,
+        IsActive = true
+    }
+};
         context.Services.AddRange(services);
         context.SaveChanges();
 
         // Seed Branches (4 locations in New York area)
         var branches = new[]
         {
-            new Branch 
-            { 
-                Name = "Downtown Manhattan Branch", 
-                Address = "123 Wall Street", 
-                City = "New York", 
-                Phone = "+12125551001", 
-                Email = "downtown@appointmentbank.com", 
-                IsActive = true 
-            },
-            new Branch 
-            { 
-                Name = "Uptown Manhattan Branch", 
-                Address = "456 Park Avenue", 
-                City = "New York", 
-                Phone = "+12125551002", 
-                Email = "uptown@appointmentbank.com", 
-                IsActive = true 
-            },
-            new Branch 
-            { 
-                Name = "Brooklyn Heights Branch", 
-                Address = "789 Atlantic Avenue", 
-                City = "Brooklyn", 
-                Phone = "+17185551003", 
-                Email = "brooklyn@appointmentbank.com", 
-                IsActive = true 
-            },
-            new Branch 
-            { 
-                Name = "Queens Center Branch", 
-                Address = "321 Queens Boulevard", 
-                City = "Queens", 
-                Phone = "+17185551004", 
-                Email = "queens@appointmentbank.com", 
-                IsActive = true 
-            }
+new Branch
+{
+    Name = "Cape Town CBD Branch",
+    Address = "54 Strand Street",
+    City = "Cape Town",
+    Phone = "+27214301000",
+    Email = "capetowncbd@capitec.co.za",
+    IsActive = true
+},
+new Branch
+{
+    Name = "Sandton City Branch",
+    Address = "Rivonia Road, Sandton City Mall",
+    City = "Johannesburg",
+    Phone = "+27114601001",
+    Email = "sandton@capitec.co.za",
+    IsActive = true
+},
+new Branch
+{
+    Name = "Durban Gateway Branch",
+    Address = "1 Palm Boulevard, Gateway Theatre of Shopping",
+    City = "Durban",
+    Phone = "+27315101002",
+    Email = "gateway@capitec.co.za",
+    IsActive = true
+},
+new Branch
+{
+    Name = "Pretoria Menlyn Branch",
+    Address = "87 Atterbury Road, Menlyn Park",
+    City = "Pretoria",
+    Phone = "+27123201003",
+    Email = "menlyn@capitec.co.za",
+    IsActive = true
+}
         };
-        
+
         context.Branches.AddRange(branches);
         context.SaveChanges();
 
         // After SaveChanges, the branches array will have their generated IDs populated by EF Core
-        
+
         // Seed Operating Hours
         // Monday-Friday: 9:00 AM - 5:00 PM
         // Saturday: 9:00 AM - 1:00 PM
         // Sunday: Closed
         var operatingHours = new List<BranchOperatingHours>();
-        
+
         foreach (var branch in branches)
         {
             // Monday (1) to Friday (5)
@@ -141,7 +154,7 @@ public static class DbInitializer
                     IsClosed = false
                 });
             }
-            
+
             // Saturday (6)
             operatingHours.Add(new BranchOperatingHours
             {
@@ -151,7 +164,7 @@ public static class DbInitializer
                 CloseTime = new TimeSpan(13, 0, 0), // 1:00 PM
                 IsClosed = false
             });
-            
+
             // Sunday (0) - Closed
             operatingHours.Add(new BranchOperatingHours
             {
@@ -162,15 +175,15 @@ public static class DbInitializer
                 IsClosed = true
             });
         }
-        
+
         context.BranchOperatingHours.AddRange(operatingHours);
         context.SaveChanges();
 
         // After SaveChanges, both branches and services arrays have their generated IDs populated by EF Core
-        
+
         // Seed BranchServices (all branches offer all services)
         var branchServices = new List<BranchService>();
-        
+
         foreach (var branch in branches)
         {
             foreach (var service in services)
@@ -182,7 +195,7 @@ public static class DbInitializer
                 });
             }
         }
-        
+
         context.BranchServices.AddRange(branchServices);
         context.SaveChanges();
     }

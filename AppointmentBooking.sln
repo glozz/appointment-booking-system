@@ -1,0 +1,55 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{BA97E5EB-0098-4176-83CB-F59D2890B53D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AppointmentBooking.Core", "src\AppointmentBooking.Core\AppointmentBooking.Core.csproj", "{A5727561-A54A-4535-9BDC-61805EB2859F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AppointmentBooking.Application", "src\AppointmentBooking.Application\AppointmentBooking.Application.csproj", "{7DB02EF2-3E90-4BB3-8EFE-AC49774AF7F2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AppointmentBooking.Infrastructure", "src\AppointmentBooking.Infrastructure\AppointmentBooking.Infrastructure.csproj", "{9131AF57-B8B2-49BB-91A6-93FD09AD9E1A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AppointmentBooking.API", "src\AppointmentBooking.API\AppointmentBooking.API.csproj", "{4CC85334-78E5-47BC-BA6D-C7D674666D8D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AppointmentBooking.Web", "src\AppointmentBooking.Web\AppointmentBooking.Web.csproj", "{3190B6F0-F70C-4AF4-ABC4-1B52906D7E50}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{A5727561-A54A-4535-9BDC-61805EB2859F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A5727561-A54A-4535-9BDC-61805EB2859F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A5727561-A54A-4535-9BDC-61805EB2859F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A5727561-A54A-4535-9BDC-61805EB2859F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7DB02EF2-3E90-4BB3-8EFE-AC49774AF7F2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7DB02EF2-3E90-4BB3-8EFE-AC49774AF7F2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7DB02EF2-3E90-4BB3-8EFE-AC49774AF7F2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7DB02EF2-3E90-4BB3-8EFE-AC49774AF7F2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9131AF57-B8B2-49BB-91A6-93FD09AD9E1A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9131AF57-B8B2-49BB-91A6-93FD09AD9E1A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9131AF57-B8B2-49BB-91A6-93FD09AD9E1A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9131AF57-B8B2-49BB-91A6-93FD09AD9E1A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4CC85334-78E5-47BC-BA6D-C7D674666D8D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4CC85334-78E5-47BC-BA6D-C7D674666D8D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4CC85334-78E5-47BC-BA6D-C7D674666D8D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4CC85334-78E5-47BC-BA6D-C7D674666D8D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3190B6F0-F70C-4AF4-ABC4-1B52906D7E50}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3190B6F0-F70C-4AF4-ABC4-1B52906D7E50}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3190B6F0-F70C-4AF4-ABC4-1B52906D7E50}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3190B6F0-F70C-4AF4-ABC4-1B52906D7E50}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{A5727561-A54A-4535-9BDC-61805EB2859F} = {BA97E5EB-0098-4176-83CB-F59D2890B53D}
+		{7DB02EF2-3E90-4BB3-8EFE-AC49774AF7F2} = {BA97E5EB-0098-4176-83CB-F59D2890B53D}
+		{9131AF57-B8B2-49BB-91A6-93FD09AD9E1A} = {BA97E5EB-0098-4176-83CB-F59D2890B53D}
+		{4CC85334-78E5-47BC-BA6D-C7D674666D8D} = {BA97E5EB-0098-4176-83CB-F59D2890B53D}
+		{3190B6F0-F70C-4AF4-ABC4-1B52906D7E50} = {BA97E5EB-0098-4176-83CB-F59D2890B53D}
+	EndGlobalSection
+EndGlobal
