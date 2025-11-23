@@ -22,4 +22,8 @@
     <ProjectReference Include="..\AppointmentBooking.Core\AppointmentBooking.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Migrations\" />
+  </ItemGroup>
+
 </Project>

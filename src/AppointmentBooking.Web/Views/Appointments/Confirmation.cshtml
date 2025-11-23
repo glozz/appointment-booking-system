@@ -25,7 +25,11 @@
                         </tr>
                         <tr>
                             <th>Time:</th>
-                            <td>@Model.StartTime.ToString(@"HH\:mm") - @Model.EndTime.ToString(@"HH\:mm")</td>
+                            <td>
+                                @(Model.StartTime != null ? Model.StartTime.ToString(@"hh\:mm") : "--:--")
+                                -
+                                @(Model.EndTime != null ? Model.EndTime.ToString(@"hh\:mm") : "--:--")
+                            </td>
                         </tr>
                         <tr>
                             <th>Branch:</th>
