@@ -15,23 +15,26 @@ public static class DbInitializer
         // Seed admin user if no users exist
         if (!context.Users.Any())
         {
-            // Use provided password or default (should be changed in production via environment variable)
-            var password = adminPassword ?? Environment.GetEnvironmentVariable("ADMIN_DEFAULT_PASSWORD") ?? "Admin@123";
-            
-            var adminUser = new User
+            if (!context.Users.Any(u => u.Email == "admin@appointmentbooking.com"))
             {
-                FirstName = "Admin",
-                LastName = "User",
-                Email = "admin@appointmentbooking.com",
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(password, 12),
-                Phone = "+1234567890",
-                Role = UserRole.Admin,
-                IsActive = true,
-                EmailVerified = true,
-                CreatedAt = DateTime.UtcNow
-            };
-            context.Users.Add(adminUser);
-            context.SaveChanges();
+                // Use provided password or default (should be changed in production via environment variable)
+                var password = adminPassword ?? Environment.GetEnvironmentVariable("ADMIN_DEFAULT_PASSWORD") ?? "Admin@123";
+         
+                var adminUser = new User
+                {
+                    FirstName = "Admin",
+                    LastName = "User",
+                    Email = "admin@appointmentbooking.com",
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(password, 12),
+                    Phone = "+1234567890",
+                    Role = UserRole.Admin,
+                    IsActive = true,
+                    EmailVerified = true,
+                    CreatedAt = DateTime.UtcNow
+                };
+                context.Users.Add(adminUser);
+                context.SaveChanges();
+            }
         }
 
         // Check if already seeded
@@ -40,9 +43,9 @@ public static class DbInitializer
             return; // Database already seeded
         }
 
-    //Seed Services (banking services)
-    var services = new[]
-    {
+        //Seed Services (banking services)
+        var services = new[]
+        {
     new Service
     {
         Name = "New Account Application",
