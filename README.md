@@ -94,7 +94,9 @@ A production-ready appointment booking system built with C# .NET 8 featuring com
 
 ### Default Admin Account
 - Email: `admin@appointmentbooking.com`
-- Password: `Admin@123`
+- Password: `Admin@123` (default, should be changed in production)
+
+> **Security Note:** Set the `ADMIN_DEFAULT_PASSWORD` environment variable to override the default admin password in production environments.
 
 ## Project Structure
 
@@ -195,6 +197,7 @@ tests/
 - `ConnectionStrings__DefaultConnection` - Database connection string
 - `Jwt__Key` - JWT signing key
 - `App__BaseUrl` - Base URL for email links
+- `ADMIN_DEFAULT_PASSWORD` - Default admin password (overrides hardcoded default)
 
 ## Security Features
 

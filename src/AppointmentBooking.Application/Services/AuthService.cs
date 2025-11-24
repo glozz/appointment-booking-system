@@ -427,7 +427,6 @@ public class AuthService : IAuthService
     private async Task<(string accessToken, string refreshToken, DateTime expiresAt)> CreateSessionAsync(
         User user, string? ipAddress, string? userAgent, bool rememberMe = false)
     {
-        var accessToken = GenerateAccessToken(user);
         var refreshToken = GenerateSecureToken();
         var expiresAt = DateTime.UtcNow.AddDays(rememberMe ? 30 : 7);
 
@@ -444,10 +443,13 @@ public class AuthService : IAuthService
         await _unitOfWork.Sessions.AddAsync(session);
         await _unitOfWork.SaveChangesAsync();
 
+        // Generate access token with session ID
+        var accessToken = GenerateAccessToken(user, session.Id);
+
         return (accessToken, refreshToken, expiresAt);
     }
 
-    private string GenerateAccessToken(User user)
+    private string GenerateAccessToken(User user, int sessionId = 0)
     {
         var jwtKey = _configuration["Jwt:Key"] ?? throw new InvalidOperationException("JWT key not configured");
         var jwtIssuer = _configuration["Jwt:Issuer"] ?? "AppointmentBooking";
@@ -464,6 +466,7 @@ public class AuthService : IAuthService
             new Claim(ClaimTypes.Role, user.Role.ToString()),
             new Claim("firstName", user.FirstName),
             new Claim("lastName", user.LastName),
+            new Claim("sessionId", sessionId.ToString()),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 

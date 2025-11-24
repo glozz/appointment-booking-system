@@ -7,7 +7,7 @@ namespace AppointmentBooking.Infrastructure.Data;
 /// </summary>
 public static class DbInitializer
 {
-    public static void Initialize(AppDbContext context)
+    public static void Initialize(AppDbContext context, string? adminPassword = null)
     {
         // Ensure database is created
         context.Database.EnsureCreated();
@@ -15,13 +15,15 @@ public static class DbInitializer
         // Seed admin user if no users exist
         if (!context.Users.Any())
         {
+            // Use provided password or default (should be changed in production via environment variable)
+            var password = adminPassword ?? Environment.GetEnvironmentVariable("ADMIN_DEFAULT_PASSWORD") ?? "Admin@123";
+            
             var adminUser = new User
             {
                 FirstName = "Admin",
                 LastName = "User",
                 Email = "admin@appointmentbooking.com",
-                // Password: Admin@123 (bcrypt hashed with cost factor 12)
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin@123", 12),
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(password, 12),
                 Phone = "+1234567890",
                 Role = UserRole.Admin,
                 IsActive = true,

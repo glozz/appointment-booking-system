@@ -165,7 +165,7 @@ public class UsersController : ControllerBase
 
     private int GetSessionId()
     {
-        // In a real implementation, this would come from the JWT token or session
-        return 0;
+        var sessionIdClaim = User.FindFirst("sessionId")?.Value;
+        return int.TryParse(sessionIdClaim, out var sessionId) ? sessionId : 0;
     }
 }
