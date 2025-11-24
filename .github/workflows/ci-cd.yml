@@ -1,0 +1,82 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  DOTNET_VERSION: '8.0.x'
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+    
+    - name: Restore dependencies
+      run: dotnet restore
+    
+    - name: Build
+      run: dotnet build --configuration Release --no-restore
+    
+    - name: Test
+      run: dotnet test --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./coverage
+
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      if: github.event_name == 'push'
+      with:
+        directory: ./coverage
+        fail_ci_if_error: false
+
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.event_name == 'push'
+    permissions:
+      contents: read
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+    
+    - name: Restore dependencies
+      run: dotnet restore
+    
+    - name: Security Scan
+      run: |
+        dotnet tool install --global security-scan
+        security-scan AppointmentBooking.sln || true
+
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Build API Docker image
+      run: docker build -t appointment-api:${{ github.sha }} -f src/AppointmentBooking.API/Dockerfile .
+    
+    - name: Build Web Docker image
+      run: docker build -t appointment-web:${{ github.sha }} -f src/AppointmentBooking.Web/Dockerfile .

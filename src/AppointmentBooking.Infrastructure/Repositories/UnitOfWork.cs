@@ -22,6 +22,11 @@ public class UnitOfWork : IUnitOfWork
         Services = new Repository<Service>(_context);
         BranchOperatingHours = new Repository<BranchOperatingHours>(_context);
         BranchServices = new Repository<BranchService>(_context);
+        Users = new Repository<User>(_context);
+        Sessions = new Repository<Session>(_context);
+        ActivityLogs = new Repository<ActivityLog>(_context);
+        Notifications = new Repository<Notification>(_context);
+        AppointmentTypes = new Repository<AppointmentType>(_context);
     }
 
     public IRepository<Appointment> Appointments { get; }
@@ -30,6 +35,11 @@ public class UnitOfWork : IUnitOfWork
     public IRepository<Service> Services { get; }
     public IRepository<BranchOperatingHours> BranchOperatingHours { get; }
     public IRepository<BranchService> BranchServices { get; }
+    public IRepository<User> Users { get; }
+    public IRepository<Session> Sessions { get; }
+    public IRepository<ActivityLog> ActivityLogs { get; }
+    public IRepository<Notification> Notifications { get; }
+    public IRepository<AppointmentType> AppointmentTypes { get; }
 
     public async Task<int> SaveChangesAsync()
     {
