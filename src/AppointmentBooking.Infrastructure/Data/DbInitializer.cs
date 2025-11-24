@@ -12,6 +12,26 @@ public static class DbInitializer
         // Ensure database is created
         context.Database.EnsureCreated();
 
+        // Seed admin user if no users exist
+        if (!context.Users.Any())
+        {
+            var adminUser = new User
+            {
+                FirstName = "Admin",
+                LastName = "User",
+                Email = "admin@appointmentbooking.com",
+                // Password: Admin@123 (bcrypt hashed with cost factor 12)
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin@123", 12),
+                Phone = "+1234567890",
+                Role = UserRole.Admin,
+                IsActive = true,
+                EmailVerified = true,
+                CreatedAt = DateTime.UtcNow
+            };
+            context.Users.Add(adminUser);
+            context.SaveChanges();
+        }
+
         // Check if already seeded
         if (context.Services.Any())
         {
@@ -197,6 +217,50 @@ new Branch
         }
 
         context.BranchServices.AddRange(branchServices);
+        context.SaveChanges();
+
+        // Seed AppointmentTypes
+        var appointmentTypes = new[]
+        {
+            new AppointmentType
+            {
+                Name = "Consultation",
+                Description = "General consultation appointment",
+                DurationMinutes = 30,
+                Color = "#3B82F6",
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            },
+            new AppointmentType
+            {
+                Name = "Follow-up",
+                Description = "Follow-up appointment",
+                DurationMinutes = 15,
+                Color = "#10B981",
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            },
+            new AppointmentType
+            {
+                Name = "Extended Consultation",
+                Description = "Extended consultation for complex matters",
+                DurationMinutes = 60,
+                Color = "#8B5CF6",
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            },
+            new AppointmentType
+            {
+                Name = "Quick Service",
+                Description = "Quick service for simple requests",
+                DurationMinutes = 10,
+                Color = "#F59E0B",
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            }
+        };
+
+        context.AppointmentTypes.AddRange(appointmentTypes);
         context.SaveChanges();
     }
 }

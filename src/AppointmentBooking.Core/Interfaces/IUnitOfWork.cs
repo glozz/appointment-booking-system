@@ -10,6 +10,11 @@ public interface IUnitOfWork : IDisposable
     IRepository<Service> Services { get; }
     IRepository<BranchOperatingHours> BranchOperatingHours { get; }
     IRepository<BranchService> BranchServices { get; }
+    IRepository<User> Users { get; }
+    IRepository<Session> Sessions { get; }
+    IRepository<ActivityLog> ActivityLogs { get; }
+    IRepository<Notification> Notifications { get; }
+    IRepository<AppointmentType> AppointmentTypes { get; }
     
     Task<int> SaveChangesAsync();
 }
