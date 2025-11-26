@@ -258,3 +258,74 @@ docker-compose up -d --build
 ## License
 
 MIT License
+
+## Authentication Integration
+
+The MVC web application integrates with the API's authentication system using cookies to bridge server-rendered pages with the API-first authentication.
+
+### Architecture Overview
+
+1. **AccountController**: Handles login, register, and logout actions by posting to the API endpoints (`/api/auth/login`, `/api/auth/register`, `/api/auth/logout`).
+2. **AccessTokenHandler**: A `DelegatingHandler` that automatically attaches access tokens to outgoing API requests and handles token refresh on 401 responses.
+3. **Cookie Authentication**: The web app uses ASP.NET Core cookie authentication to maintain user sessions.
+
+### Cookie Settings
+
+The application uses secure, HttpOnly cookies with the following configuration:
+
+| Cookie | Purpose | Settings |
+|--------|---------|----------|
+| `access_token` | JWT access token for API calls | HttpOnly, Secure, SameSite=Strict |
+| `refresh_token` | Token for refreshing access tokens | HttpOnly, Secure, SameSite=Strict |
+| `AppointmentBooking.Auth` | ASP.NET Core authentication cookie | HttpOnly, Secure, SameSite=Strict |
+
+### Token Refresh Contract
+
+The `AccessTokenHandler` automatically handles token refresh:
+
+1. Attaches `access_token` cookie value as Bearer token to outgoing requests
+2. On 401 Unauthorized response, attempts refresh via `POST /api/auth/refresh`
+3. Updates cookies with new tokens on successful refresh
+4. Retries the original request with the new access token
+
+**Expected API Response Format for `/api/auth/refresh`:**
+```json
+{
+  "accessToken": "eyJ...",
+  "refreshToken": "abc123...",
+  "accessTokenExpiryMinutes": 60,
+  "refreshTokenExpiryDays": 7
+}
+```
+
+### Secure Cookie Requirements
+
+For production deployments:
+
+- **HTTPS Required**: Cookies are configured with `Secure` flag, requiring HTTPS
+- **SameSite=Strict**: Prevents CSRF attacks by not sending cookies on cross-site requests
+- **HttpOnly**: Prevents JavaScript access to tokens, mitigating XSS attacks
+
+### Environment Variables
+
+Configure the following for production:
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `ApiSettings__BaseUrl` | Base URL of the authentication API | `https://api.example.com` |
+| `ConnectionStrings__DefaultConnection` | Database connection string | (see appsettings) |
+
+### Development Setup
+
+1. Ensure the API is running on the configured `ApiSettings:BaseUrl` (default: `http://localhost:5000`)
+2. Update `appsettings.json` or set environment variables
+3. Run the web application
+
+### Security Recommendations
+
+1. **Always use HTTPS** in production
+2. **Set strong JWT keys** via environment variables
+3. **Configure proper CORS** policies on the API
+4. **Enable HSTS** (HTTP Strict Transport Security)
+5. **Rotate refresh tokens** on each use
+6. **Set appropriate token expiry** times based on security requirements

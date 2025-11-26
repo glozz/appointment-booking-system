@@ -19,6 +19,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AppointmentBooking.Tests", "tests\AppointmentBooking.Tests\AppointmentBooking.Tests.csproj", "{06EBEB16-6F4F-4DB9-93DB-DA3DFD8ED903}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AppointmentBooking.Web.Tests", "src\AppointmentBooking.Web.Tests\AppointmentBooking.Web.Tests.csproj", "{F6F2BC1A-2C5B-46CE-8655-B5071ACF98B7}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -101,6 +103,18 @@ Global
 		{06EBEB16-6F4F-4DB9-93DB-DA3DFD8ED903}.Release|x64.Build.0 = Release|Any CPU
 		{06EBEB16-6F4F-4DB9-93DB-DA3DFD8ED903}.Release|x86.ActiveCfg = Release|Any CPU
 		{06EBEB16-6F4F-4DB9-93DB-DA3DFD8ED903}.Release|x86.Build.0 = Release|Any CPU
+		{F6F2BC1A-2C5B-46CE-8655-B5071ACF98B7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F6F2BC1A-2C5B-46CE-8655-B5071ACF98B7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F6F2BC1A-2C5B-46CE-8655-B5071ACF98B7}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{F6F2BC1A-2C5B-46CE-8655-B5071ACF98B7}.Debug|x64.Build.0 = Debug|Any CPU
+		{F6F2BC1A-2C5B-46CE-8655-B5071ACF98B7}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{F6F2BC1A-2C5B-46CE-8655-B5071ACF98B7}.Debug|x86.Build.0 = Debug|Any CPU
+		{F6F2BC1A-2C5B-46CE-8655-B5071ACF98B7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F6F2BC1A-2C5B-46CE-8655-B5071ACF98B7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F6F2BC1A-2C5B-46CE-8655-B5071ACF98B7}.Release|x64.ActiveCfg = Release|Any CPU
+		{F6F2BC1A-2C5B-46CE-8655-B5071ACF98B7}.Release|x64.Build.0 = Release|Any CPU
+		{F6F2BC1A-2C5B-46CE-8655-B5071ACF98B7}.Release|x86.ActiveCfg = Release|Any CPU
+		{F6F2BC1A-2C5B-46CE-8655-B5071ACF98B7}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -112,5 +126,6 @@ Global
 		{4CC85334-78E5-47BC-BA6D-C7D674666D8D} = {BA97E5EB-0098-4176-83CB-F59D2890B53D}
 		{3190B6F0-F70C-4AF4-ABC4-1B52906D7E50} = {BA97E5EB-0098-4176-83CB-F59D2890B53D}
 		{06EBEB16-6F4F-4DB9-93DB-DA3DFD8ED903} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{F6F2BC1A-2C5B-46CE-8655-B5071ACF98B7} = {BA97E5EB-0098-4176-83CB-F59D2890B53D}
 	EndGlobalSection
 EndGlobal

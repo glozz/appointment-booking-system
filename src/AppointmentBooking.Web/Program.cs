@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using AppointmentBooking.Application.Interfaces;
 using AppointmentBooking.Application.Services;
@@ -6,6 +7,7 @@ using AppointmentBooking.Application.Validators;
 using AppointmentBooking.Core.Interfaces;
 using AppointmentBooking.Infrastructure.Data;
 using AppointmentBooking.Infrastructure.Repositories;
+using AppointmentBooking.Web.Services;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 
@@ -13,6 +15,39 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services
 builder.Services.AddControllersWithViews();
+
+// HttpContextAccessor for accessing HttpContext in services
+builder.Services.AddHttpContextAccessor();
+
+// Cookie Authentication
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.LoginPath = "/Account/Login";
+        options.LogoutPath = "/Account/Logout";
+        options.AccessDeniedPath = "/Account/AccessDenied";
+        options.Cookie.Name = "AppointmentBooking.Auth";
+        options.Cookie.HttpOnly = true;
+        // Use SameAsRequest for development (allows HTTP), Always for production
+        options.Cookie.SecurePolicy = builder.Environment.IsDevelopment() 
+            ? CookieSecurePolicy.SameAsRequest 
+            : CookieSecurePolicy.Always;
+        options.Cookie.SameSite = SameSiteMode.Strict;
+        options.ExpireTimeSpan = TimeSpan.FromDays(7);
+        options.SlidingExpiration = true;
+    });
+
+// Register AccessTokenHandler
+builder.Services.AddTransient<AccessTokenHandler>();
+
+// HttpClient for Auth API
+var apiBaseUrl = builder.Configuration["ApiSettings:BaseUrl"] ?? "http://localhost:5000";
+builder.Services.AddHttpClient("AuthApi", client =>
+{
+    client.BaseAddress = new Uri(apiBaseUrl);
+    client.DefaultRequestHeaders.Add("Accept", "application/json");
+})
+.AddHttpMessageHandler<AccessTokenHandler>();
 
 // Database
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -53,6 +88,7 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllerRoute(
