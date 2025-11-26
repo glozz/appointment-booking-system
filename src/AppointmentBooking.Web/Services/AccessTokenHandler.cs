@@ -14,16 +14,21 @@ public class AccessTokenHandler : DelegatingHandler
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly IConfiguration _configuration;
     private readonly ILogger<AccessTokenHandler> _logger;
+    private readonly IWebHostEnvironment _environment;
     private static readonly SemaphoreSlim _refreshLock = new(1, 1);
+    private static string? _lastRefreshedAccessToken;
+    private static string? _lastRefreshedFromRefreshToken;
 
     public AccessTokenHandler(
         IHttpContextAccessor httpContextAccessor,
         IConfiguration configuration,
-        ILogger<AccessTokenHandler> logger)
+        ILogger<AccessTokenHandler> logger,
+        IWebHostEnvironment environment)
     {
         _httpContextAccessor = httpContextAccessor;
         _configuration = configuration;
         _logger = logger;
+        _environment = environment;
     }
 
     protected override async Task<HttpResponseMessage> SendAsync(
@@ -39,6 +44,13 @@ public class AccessTokenHandler : DelegatingHandler
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
         }
 
+        // Clone content before first send to preserve it for potential retry
+        byte[]? contentBytes = null;
+        if (request.Content != null)
+        {
+            contentBytes = await request.Content.ReadAsByteArrayAsync(cancellationToken);
+        }
+
         var response = await base.SendAsync(request, cancellationToken);
 
         // If unauthorized and we have a refresh token, attempt refresh
@@ -47,18 +59,13 @@ public class AccessTokenHandler : DelegatingHandler
             var refreshToken = httpContext.Request.Cookies["refresh_token"];
             if (!string.IsNullOrEmpty(refreshToken))
             {
-                var refreshed = await TryRefreshTokenAsync(httpContext, refreshToken, cancellationToken);
-                if (refreshed)
+                var refreshResult = await TryRefreshTokenAsync(httpContext, refreshToken, cancellationToken);
+                if (refreshResult.Success && !string.IsNullOrEmpty(refreshResult.NewAccessToken))
                 {
-                    // Retry the original request with the new token
-                    var newAccessToken = httpContext.Request.Cookies["access_token"];
-                    if (!string.IsNullOrEmpty(newAccessToken))
-                    {
-                        // Clone the request and retry
-                        var retryRequest = await CloneRequestAsync(request);
-                        retryRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", newAccessToken);
-                        response = await base.SendAsync(retryRequest, cancellationToken);
-                    }
+                    // Clone the request and retry with the new token (from refresh result, not from cookies)
+                    var retryRequest = CloneRequest(request, contentBytes);
+                    retryRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", refreshResult.NewAccessToken);
+                    response = await base.SendAsync(retryRequest, cancellationToken);
                 }
             }
         }
@@ -66,7 +73,7 @@ public class AccessTokenHandler : DelegatingHandler
         return response;
     }
 
-    private async Task<bool> TryRefreshTokenAsync(
+    private async Task<TokenRefreshResult> TryRefreshTokenAsync(
         HttpContext httpContext,
         string refreshToken,
         CancellationToken cancellationToken)
@@ -75,12 +82,12 @@ public class AccessTokenHandler : DelegatingHandler
         await _refreshLock.WaitAsync(cancellationToken);
         try
         {
-            // Check if token was already refreshed by another request
-            var currentRefreshToken = httpContext.Request.Cookies["refresh_token"];
-            if (currentRefreshToken != refreshToken)
+            // Check if token was already refreshed by another request (using stored value, not cookies)
+            if (_lastRefreshedFromRefreshToken == refreshToken && !string.IsNullOrEmpty(_lastRefreshedAccessToken))
             {
-                // Token was already refreshed
-                return true;
+                // Token was already refreshed, return the stored access token
+                _logger.LogDebug("Using previously refreshed token");
+                return new TokenRefreshResult { Success = true, NewAccessToken = _lastRefreshedAccessToken };
             }
 
             var apiBaseUrl = _configuration["ApiSettings:BaseUrl"] ?? "http://localhost:5000";
@@ -106,18 +113,23 @@ public class AccessTokenHandler : DelegatingHandler
                 if (tokenResponse != null && !string.IsNullOrEmpty(tokenResponse.AccessToken))
                 {
                     UpdateCookies(httpContext, tokenResponse);
+                    
+                    // Store the refreshed token for concurrent requests
+                    _lastRefreshedFromRefreshToken = refreshToken;
+                    _lastRefreshedAccessToken = tokenResponse.AccessToken;
+                    
                     _logger.LogInformation("Access token refreshed successfully");
-                    return true;
+                    return new TokenRefreshResult { Success = true, NewAccessToken = tokenResponse.AccessToken };
                 }
             }
 
             _logger.LogWarning("Failed to refresh access token. Status: {StatusCode}", refreshResponse.StatusCode);
-            return false;
+            return new TokenRefreshResult { Success = false };
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error refreshing access token");
-            return false;
+            return new TokenRefreshResult { Success = false };
         }
         finally
         {
@@ -127,10 +139,13 @@ public class AccessTokenHandler : DelegatingHandler
 
     private void UpdateCookies(HttpContext httpContext, TokenRefreshResponse tokenResponse)
     {
+        // Use secure cookies in production, allow non-secure in development
+        var useSecureCookies = !_environment.IsDevelopment();
+        
         var accessTokenOptions = new CookieOptions
         {
             HttpOnly = true,
-            Secure = true,
+            Secure = useSecureCookies,
             SameSite = SameSiteMode.Strict,
             Expires = DateTimeOffset.UtcNow.AddMinutes(tokenResponse.AccessTokenExpiryMinutes)
         };
@@ -138,7 +153,7 @@ public class AccessTokenHandler : DelegatingHandler
         var refreshTokenOptions = new CookieOptions
         {
             HttpOnly = true,
-            Secure = true,
+            Secure = useSecureCookies,
             SameSite = SameSiteMode.Strict,
             Expires = DateTimeOffset.UtcNow.AddDays(tokenResponse.RefreshTokenExpiryDays)
         };
@@ -151,28 +166,33 @@ public class AccessTokenHandler : DelegatingHandler
         }
     }
 
-    private static async Task<HttpRequestMessage> CloneRequestAsync(HttpRequestMessage request)
+    private static HttpRequestMessage CloneRequest(HttpRequestMessage request, byte[]? contentBytes)
     {
         var clone = new HttpRequestMessage(request.Method, request.RequestUri)
         {
             Version = request.Version
         };
 
-        // Copy headers
+        // Copy headers (except Authorization which will be set by caller)
         foreach (var header in request.Headers)
         {
-            clone.Headers.TryAddWithoutValidation(header.Key, header.Value);
+            if (!string.Equals(header.Key, "Authorization", StringComparison.OrdinalIgnoreCase))
+            {
+                clone.Headers.TryAddWithoutValidation(header.Key, header.Value);
+            }
         }
 
-        // Copy content if present
-        if (request.Content != null)
+        // Set content from pre-read bytes if present
+        if (contentBytes != null)
         {
-            var contentBytes = await request.Content.ReadAsByteArrayAsync();
             clone.Content = new ByteArrayContent(contentBytes);
             
-            foreach (var header in request.Content.Headers)
+            if (request.Content != null)
             {
-                clone.Content.Headers.TryAddWithoutValidation(header.Key, header.Value);
+                foreach (var header in request.Content.Headers)
+                {
+                    clone.Content.Headers.TryAddWithoutValidation(header.Key, header.Value);
+                }
             }
         }
 
@@ -185,5 +205,11 @@ public class AccessTokenHandler : DelegatingHandler
         public string RefreshToken { get; set; } = string.Empty;
         public int AccessTokenExpiryMinutes { get; set; } = 60;
         public int RefreshTokenExpiryDays { get; set; } = 7;
+    }
+
+    private class TokenRefreshResult
+    {
+        public bool Success { get; set; }
+        public string? NewAccessToken { get; set; }
     }
 }

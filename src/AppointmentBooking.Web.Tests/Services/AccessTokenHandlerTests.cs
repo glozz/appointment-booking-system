@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -17,15 +18,18 @@ public class AccessTokenHandlerTests
     private readonly Mock<IHttpContextAccessor> _httpContextAccessorMock;
     private readonly Mock<IConfiguration> _configurationMock;
     private readonly Mock<ILogger<AccessTokenHandler>> _loggerMock;
+    private readonly Mock<IWebHostEnvironment> _environmentMock;
 
     public AccessTokenHandlerTests()
     {
         _httpContextAccessorMock = new Mock<IHttpContextAccessor>();
         _configurationMock = new Mock<IConfiguration>();
         _loggerMock = new Mock<ILogger<AccessTokenHandler>>();
+        _environmentMock = new Mock<IWebHostEnvironment>();
 
         // Setup default configuration
         _configurationMock.Setup(c => c["ApiSettings:BaseUrl"]).Returns("http://localhost:5000");
+        _environmentMock.Setup(e => e.EnvironmentName).Returns("Development");
     }
 
     [Fact]
@@ -129,7 +133,8 @@ public class AccessTokenHandlerTests
         return new AccessTokenHandler(
             _httpContextAccessorMock.Object,
             _configurationMock.Object,
-            _loggerMock.Object);
+            _loggerMock.Object,
+            _environmentMock.Object);
     }
 
     private static HttpContext CreateMockHttpContext(string? accessToken = null, string? refreshToken = null)
