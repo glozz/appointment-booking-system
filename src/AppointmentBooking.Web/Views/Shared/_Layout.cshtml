@@ -26,14 +26,14 @@
                     <li class="nav-item">
                         <a class="nav-link" asp-controller="Home" asp-action="Index">Home</a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link" asp-controller="Appointments" asp-action="Book">Book</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" asp-controller="Appointments" asp-action="Lookup">Lookup</a>
-                    </li>
                     @if (User.Identity?.IsAuthenticated == true)
                     {
+                        <li class="nav-item">
+                            <a class="nav-link" asp-controller="Appointments" asp-action="Book">Book</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" asp-controller="Appointments" asp-action="Lookup">Lookup</a>
+                        </li>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 <i class="bi bi-person-circle"></i> @User.Identity.Name
@@ -41,6 +41,7 @@
                             <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
                                 <li>
                                     <form asp-controller="Account" asp-action="Logout" method="post" class="dropdown-item p-0">
+                                        @Html.AntiForgeryToken()
                                         <button type="submit" class="btn btn-link dropdown-item">
                                             <i class="bi bi-box-arrow-right"></i> Logout
                                         </button>

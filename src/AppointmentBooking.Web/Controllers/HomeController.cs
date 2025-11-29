@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using AppointmentBooking.Application.Interfaces;
 using AppointmentBooking.Web.Models;
@@ -15,6 +16,7 @@ public class HomeController : Controller
         _serviceService = serviceService;
     }
 
+    [AllowAnonymous]
     public async Task<IActionResult> Index()
     {
         var branches = await _branchService.GetActiveBranchesAsync();
@@ -29,11 +31,13 @@ public class HomeController : Controller
         return View(viewModel);
     }
 
+    [AllowAnonymous]
     public IActionResult Privacy()
     {
         return View();
     }
 
+    [AllowAnonymous]
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
     public IActionResult Error()
     {
