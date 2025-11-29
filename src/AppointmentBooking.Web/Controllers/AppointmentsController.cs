@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using AppointmentBooking.Application.DTOs;
 using AppointmentBooking.Application.Interfaces;
@@ -5,6 +6,7 @@ using AppointmentBooking.Core.Exceptions;
 
 namespace AppointmentBooking.Web.Controllers;
 
+[Authorize]
 public class AppointmentsController : Controller
 {
     private readonly IAppointmentService _appointmentService;
