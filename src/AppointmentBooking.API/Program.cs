@@ -130,8 +130,14 @@ using (var scope = app.Services.CreateScope())
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(c =>
+    {
+        c.RoutePrefix = "swagger";
+    });
 }
+
+// Redirect root to Swagger UI
+app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription();
 
 app.UseHttpsRedirection();
 app.UseCors("AllowAll");
