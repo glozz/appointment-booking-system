@@ -229,6 +229,7 @@ The database is automatically created and seeded with:
 - 4 branches with operating hours
 - 9 banking services
 - 4 appointment types
+- 6 consultants per branch with unique South African names
 
 ### Database Tables
 - `Users` - User accounts with authentication data
@@ -240,6 +241,43 @@ The database is automatically created and seeded with:
 - `Customers` - Customer information
 - `Branches` - Branch locations
 - `Services` - Available services
+- `Consultants` - Branch consultants who handle appointments
+
+## Booking Rules
+
+The appointment booking system enforces the following rules:
+
+### Operating Hours
+- Default operating hours: **08:00 - 17:00**
+- Branch-specific operating hours are respected when configured
+- Bookings cannot be made outside operating hours or on closed days
+
+### Time Slots
+- All appointments must be scheduled on **15-minute increments** (e.g., 09:00, 09:15, 09:30, 09:45)
+- Appointment duration is determined by the selected service
+
+### Double-Booking Prevention
+- A unique index on `(BranchId, AppointmentDate, StartTime)` prevents duplicate bookings at the same time slot
+- Server-side validation rejects bookings for already-occupied slots
+
+### Consultant Auto-Assignment
+- When creating an appointment, a consultant is automatically assigned from the selected branch
+- A consultant is considered available if they have no overlapping appointments in the requested time window
+- Overlap detection uses robust logic: `existing.Start < requestedEnd && requestedStart < existing.End`
+- If no consultants are available, the booking is rejected with an appropriate error message
+
+### Customer Details
+- Customer information (First Name, Last Name, Email, Phone) is pre-populated from the logged-in user's account
+- Customer fields are rendered as readonly on the booking form
+- Server-side validation re-resolves customer information from the authenticated user to prevent tampering
+
+## Consultant Seeding
+
+At application startup, the system automatically seeds 6 consultants per branch:
+- Each consultant has a unique South African first name: **Thabo, Sipho, Nomsa, Lerato, Kabelo, Ayanda**
+- The surname matches the branch name (e.g., "Thabo Sandton" for Sandton City Branch)
+- The seeder is idempotent: it only adds consultants if fewer than 6 exist for a branch
+- Consultants are stored in the `Consultants` table with a foreign key to their branch
 
 ## Logs
 

@@ -40,6 +40,8 @@ public static class DbInitializer
         // Check if already seeded
         if (context.Services.Any())
         {
+            // Ensure consultants are seeded even for existing databases
+            SeedConsultants(context);
             return; // Database already seeded
         }
 
@@ -266,6 +268,66 @@ new Branch
         };
 
         context.AppointmentTypes.AddRange(appointmentTypes);
+        context.SaveChanges();
+
+        // Seed Consultants for all branches
+        SeedConsultants(context);
+    }
+
+    /// <summary>
+    /// Seeds 6 consultants per branch with unique South African first names and branch-specific surnames.
+    /// This method is idempotent - it only adds consultants if fewer than 6 exist for a branch.
+    /// </summary>
+    public static void SeedConsultants(AppDbContext context)
+    {
+        // South African first names for consultants (6 unique names per branch)
+        var firstNames = new[] { "Thabo", "Sipho", "Nomsa", "Lerato", "Kabelo", "Ayanda" };
+
+        var branches = context.Branches.ToList();
+
+        foreach (var branch in branches)
+        {
+            // Count existing consultants for this branch
+            var existingCount = context.Consultants.Count(c => c.BranchId == branch.Id);
+            
+            // Only seed if fewer than 6 consultants exist
+            if (existingCount >= 6)
+                continue;
+
+            // Extract surname from branch name (e.g., "Sandton City Branch" -> "Sandton")
+            // Use first word of branch name as surname
+            var branchNameParts = branch.Name.Split(' ');
+            var surname = branchNameParts.Length > 0 ? branchNameParts[0] : branch.Name;
+
+            // Get existing consultant first names for this branch to avoid duplicates
+            var existingFirstNames = context.Consultants
+                .Where(c => c.BranchId == branch.Id)
+                .Select(c => c.FirstName)
+                .ToHashSet();
+
+            foreach (var firstName in firstNames)
+            {
+                // Skip if this first name already exists for this branch
+                if (existingFirstNames.Contains(firstName))
+                    continue;
+
+                // Stop if we've reached 6 consultants
+                if (existingCount >= 6)
+                    break;
+
+                context.Consultants.Add(new Consultant
+                {
+                    FirstName = firstName,
+                    LastName = surname,
+                    BranchId = branch.Id,
+                    IsActive = true,
+                    CreatedAt = DateTime.UtcNow
+                });
+
+                existingCount++;
+            }
+        }
+
         context.SaveChanges();
     }
 }

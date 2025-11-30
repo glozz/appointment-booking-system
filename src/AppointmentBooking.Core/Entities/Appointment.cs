@@ -20,6 +20,9 @@ public class Appointment
     public int ServiceId { get; set; }
     public Service Service { get; set; } = null!;
     
+    public int? ConsultantId { get; set; }
+    public Consultant? Consultant { get; set; }
+    
     [Required]
     public DateTime AppointmentDate { get; set; }
     

@@ -33,4 +33,5 @@ public class Branch
     public ICollection<BranchOperatingHours> OperatingHours { get; set; } = new List<BranchOperatingHours>();
     public ICollection<BranchService> BranchServices { get; set; } = new List<BranchService>();
     public ICollection<Appointment> Appointments { get; set; } = new List<Appointment>();
+    public ICollection<Consultant> Consultants { get; set; } = new List<Consultant>();
 }
