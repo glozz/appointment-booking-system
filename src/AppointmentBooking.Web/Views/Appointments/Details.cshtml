@@ -22,7 +22,13 @@
                         </tr>
                         <tr>
                             <th>Time:</th>
-                            <td>@Model.StartTime.ToString(@"HH\:mm") - @Model.EndTime.ToString(@"HH\:mm")</td>
+                            <td>
+
+                                @* @Model.StartTime.ToString(@"HH\:mm") - @Model.EndTime.ToString(@"HH\:mm") *@
+                                @(Model.StartTime != null ? Model.StartTime.ToString(@"hh\:mm") : "--:--")
+    -
+                                @(Model.EndTime != null ? Model.EndTime.ToString(@"hh\:mm") : "--:--")
+                            </td>
                         </tr>
                         <tr>
                             <th>Branch:</th>
@@ -37,49 +43,49 @@
                             <td>
                                 @if (Model.Status == AppointmentBooking.Core.Enums.AppointmentStatus.Confirmed)
                                 {
-                                    <span class="badge bg-success">Confirmed</span>
+                                        <span class="badge bg-success">Confirmed</span>
                                 }
                                 else if (Model.Status == AppointmentBooking.Core.Enums.AppointmentStatus.Cancelled)
                                 {
-                                    <span class="badge bg-danger">Cancelled</span>
+                                        <span class="badge bg-danger">Cancelled</span>
                                 }
                                 else
                                 {
-                                    <span class="badge bg-secondary">@Model.Status</span>
+                                        <span class="badge bg-secondary">@Model.Status</span>
                                 }
                             </td>
                         </tr>
                         @if (!string.IsNullOrEmpty(Model.Notes))
                         {
-                            <tr>
-                                <th>Notes:</th>
-                                <td>@Model.Notes</td>
-                            </tr>
+                                <tr>
+                                    <th>Notes:</th>
+                                    <td>@Model.Notes</td>
+                                </tr>
                         }
                     </table>
 
                     @if (Model.Status == AppointmentBooking.Core.Enums.AppointmentStatus.Confirmed)
                     {
-                        <hr class="my-4" />
-                        <h5>Cancel Appointment</h5>
-                        <form asp-action="Cancel" method="post" onsubmit="return confirm('Are you sure you want to cancel this appointment?');">
-                            <input type="hidden" name="id" value="@Model.Id" />
-                            <div class="mb-3">
-                                <label for="reason" class="form-label">Cancellation Reason</label>
-                                <textarea name="reason" class="form-control" rows="2" required placeholder="Please provide a reason for cancellation"></textarea>
-                            </div>
-                            <button type="submit" class="btn btn-danger">
-                                <i class="bi bi-x-circle"></i> Cancel Appointment
-                            </button>
-                        </form>
+                            <hr class="my-4" />
+                            <h5>Cancel Appointment</h5>
+                            <form asp-action="Cancel" method="post" onsubmit="return confirm('Are you sure you want to cancel this appointment?');">
+                                <input type="hidden" name="id" value="@Model.Id" />
+                                <div class="mb-3">
+                                    <label for="reason" class="form-label">Cancellation Reason</label>
+                                    <textarea name="reason" class="form-control" rows="2" required placeholder="Please provide a reason for cancellation"></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-danger">
+                                    <i class="bi bi-x-circle"></i> Cancel Appointment
+                                </button>
+                            </form>
                     }
                     else
                     {
-                        <div class="d-grid mt-4">
-                            <a asp-controller="Home" asp-action="Index" class="btn btn-primary">
-                                <i class="bi bi-house"></i> Back to Home
-                            </a>
-                        </div>
+                            <div class="d-grid mt-4">
+                                <a asp-controller="Home" asp-action="Index" class="btn btn-primary">
+                                    <i class="bi bi-house"></i> Back to Home
+                                </a>
+                            </div>
                     }
                 </div>
             </div>

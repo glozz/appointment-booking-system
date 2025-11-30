@@ -141,25 +141,42 @@ public class AppointmentService : IAppointmentService
     /// </summary>
     public async Task<AppointmentDto?> GetAppointmentByConfirmationCodeAsync(string confirmationCode)
     {
-        _logger.LogDebug("Retrieving appointment with confirmation code: {ConfirmationCode}", confirmationCode);
-
-        var appointments = await _unitOfWork.Appointments.FindAsync(a => 
-            a.ConfirmationCode == confirmationCode);
-        var appointment = appointments.FirstOrDefault();
-        
-        if (appointment == null)
+        if (string.IsNullOrWhiteSpace(confirmationCode))
         {
-            _logger.LogWarning("Appointment not found with confirmation code: {ConfirmationCode}", confirmationCode);
+            _logger.LogWarning("Empty confirmation code provided.");
             return null;
         }
 
-        return _mapper.Map<AppointmentDto>(appointment);
+        _logger.LogDebug("Retrieving appointment with confirmation code: {Code}", confirmationCode);
+
+        // Repository has no Query()/Include; use FindAsync then explicit load
+        var found = await _unitOfWork.Appointments.FindAsync(a => a.ConfirmationCode == confirmationCode);
+        var appointment = found.FirstOrDefault();
+
+        if (appointment == null)
+        {
+            _logger.LogInformation("No appointment found for confirmation code: {Code}", confirmationCode);
+            return null;
+        }
+
+        // Explicitly load navigation properties if missing
+        if (appointment.Branch == null && appointment.BranchId != 0)
+            appointment.Branch = await _unitOfWork.Branches.GetByIdAsync(appointment.BranchId);
+
+        if (appointment.Service == null && appointment.ServiceId != 0)
+            appointment.Service = await _unitOfWork.Services.GetByIdAsync(appointment.ServiceId);
+
+        var dto = _mapper.Map<AppointmentDto>(appointment);
+        dto.Branch.Name ??= appointment.Branch?.Name;
+        dto.Service.Name ??= appointment.Service?.Name;
+
+        return dto;
     }
 
-    /// <summary>
-    /// Get all appointments
-    /// </summary>
-    public async Task<IEnumerable<AppointmentDto>> GetAllAppointmentsAsync()
+/// <summary>
+/// Get all appointments
+/// </summary>
+public async Task<IEnumerable<AppointmentDto>> GetAllAppointmentsAsync()
     {
         _logger.LogDebug("Retrieving all appointments");
 

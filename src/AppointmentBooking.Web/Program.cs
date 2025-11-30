@@ -49,14 +49,21 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 // Register AccessTokenHandler
 builder.Services.AddTransient<AccessTokenHandler>();
 
+
+builder.Services.AddHttpClient("AuthApi", c => c.BaseAddress = new Uri("https://localhost:61577/"))
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+    {
+        ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+    });
+
 // HttpClient for Auth API
-var apiBaseUrl = builder.Configuration["ApiSettings:BaseUrl"] ?? "http://localhost:5000";
-builder.Services.AddHttpClient("AuthApi", client =>
-{
-    client.BaseAddress = new Uri(apiBaseUrl);
-    client.DefaultRequestHeaders.Add("Accept", "application/json");
-})
-.AddHttpMessageHandler<AccessTokenHandler>();
+//var apiBaseUrl = builder.Configuration["ApiSettings:BaseUrl"] ?? "http://localhost:5000";
+//builder.Services.AddHttpClient("AuthApi", client =>
+//{
+//    client.BaseAddress = new Uri(apiBaseUrl);
+//    client.DefaultRequestHeaders.Add("Accept", "application/json");
+//})
+//.AddHttpMessageHandler<AccessTokenHandler>();
 
 // Database
 builder.Services.AddDbContext<AppDbContext>(options =>

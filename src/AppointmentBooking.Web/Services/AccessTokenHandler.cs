@@ -90,7 +90,7 @@ public class AccessTokenHandler : DelegatingHandler
                 return new TokenRefreshResult { Success = true, NewAccessToken = _lastRefreshedAccessToken };
             }
 
-            var apiBaseUrl = _configuration["ApiSettings:BaseUrl"] ?? "http://localhost:5000";
+            var apiBaseUrl = _configuration["ApiSettings:BaseUrl"] ?? "http://localhost:61577";
             var refreshEndpoint = $"{apiBaseUrl.TrimEnd('/')}/api/auth/refresh";
 
             using var refreshClient = new HttpClient();
