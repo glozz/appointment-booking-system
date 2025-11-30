@@ -210,7 +210,7 @@ public class AppointmentService : IAppointmentService
     /// <summary>
     /// Finds an available consultant for the given time slot using robust overlap detection.
     /// A consultant is available if they have no overlapping appointments:
-    /// existing.Start &lt; requestedEnd &amp;&amp; requestedStart &lt; (existing.End ?? existing.Start + defaultDuration)
+    /// existing.Start < requestedEnd AND requestedStart < (existing.End or existing.Start + duration)
     /// </summary>
     private async Task<int?> FindAvailableConsultantAsync(int branchId, DateTime date, TimeSpan requestedStart, TimeSpan requestedEnd)
     {
@@ -226,6 +226,8 @@ public class AppointmentService : IAppointmentService
         foreach (var consultant in consultants)
         {
             // Check for overlapping appointments for this consultant
+            // Note: The fallback to DefaultSlotDurationMinutes is only for legacy/malformed data
+            // where EndTime might not be set. All properly created appointments have EndTime set.
             var overlappingAppointments = await _unitOfWork.Appointments.FindAsync(a =>
                 a.ConsultantId == consultant.Id &&
                 a.AppointmentDate == date &&
@@ -329,6 +331,8 @@ public class AppointmentService : IAppointmentService
 
     /// <summary>
     /// Get all appointments
+    /// Note: This method has N+1 query performance characteristics. For large datasets,
+    /// consider implementing eager loading in the repository layer using Include().
     /// </summary>
     public async Task<IEnumerable<AppointmentDto>> GetAllAppointmentsAsync()
     {

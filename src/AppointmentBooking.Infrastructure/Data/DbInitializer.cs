@@ -280,15 +280,25 @@ new Branch
     /// </summary>
     public static void SeedConsultants(AppDbContext context)
     {
+        // Quick check: if all branches already have 6+ consultants, skip seeding
+        var branches = context.Branches.ToList();
+        var consultantCountsByBranch = context.Consultants
+            .GroupBy(c => c.BranchId)
+            .ToDictionary(g => g.Key, g => g.Count());
+        
+        var allBranchesHaveEnoughConsultants = branches.All(b => 
+            consultantCountsByBranch.TryGetValue(b.Id, out var count) && count >= 6);
+        
+        if (allBranchesHaveEnoughConsultants)
+            return; // All branches already have enough consultants
+
         // South African first names for consultants (6 unique names per branch)
         var firstNames = new[] { "Thabo", "Sipho", "Nomsa", "Lerato", "Kabelo", "Ayanda" };
-
-        var branches = context.Branches.ToList();
 
         foreach (var branch in branches)
         {
             // Count existing consultants for this branch
-            var existingCount = context.Consultants.Count(c => c.BranchId == branch.Id);
+            var existingCount = consultantCountsByBranch.TryGetValue(branch.Id, out var cnt) ? cnt : 0;
             
             // Only seed if fewer than 6 consultants exist
             if (existingCount >= 6)
