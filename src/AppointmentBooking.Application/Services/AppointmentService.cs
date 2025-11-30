@@ -20,6 +20,13 @@ public class AppointmentService : IAppointmentService
     private readonly INotificationService _notificationService;
     private readonly IAvailabilityService _availabilityService;
 
+    // Default slot duration in minutes (configurable)
+    private const int DefaultSlotDurationMinutes = 15;
+    
+    // Default operating hours (configurable per branch in the future)
+    private static readonly TimeSpan DefaultOpenTime = new TimeSpan(8, 0, 0);  // 08:00
+    private static readonly TimeSpan DefaultCloseTime = new TimeSpan(17, 0, 0); // 17:00
+
     public AppointmentService(
         IUnitOfWork unitOfWork,
         IMapper mapper,
@@ -35,7 +42,8 @@ public class AppointmentService : IAppointmentService
     }
 
     /// <summary>
-    /// Create a new appointment with conflict detection and confirmation code generation
+    /// Create a new appointment with conflict detection, operating hours validation,
+    /// double-booking prevention, and consultant auto-assignment
     /// </summary>
     public async Task<AppointmentDto> CreateAppointmentAsync(CreateAppointmentDto dto)
     {
@@ -52,6 +60,15 @@ public class AppointmentService : IAppointmentService
 
         var endTime = dto.StartTime.Add(TimeSpan.FromMinutes(service.DurationMinutes));
 
+        // Validate 15-minute slot increment
+        ValidateSlotIncrement(dto.StartTime);
+
+        // Validate operating hours
+        await ValidateOperatingHoursAsync(dto.BranchId, dto.AppointmentDate, dto.StartTime, endTime);
+
+        // Double-booking prevention: check if slot already exists for this branch
+        await ValidateNoDoubleBookingAsync(dto.BranchId, dto.AppointmentDate, dto.StartTime);
+
         // Check slot availability (conflict detection + lead time validation)
         var isAvailable = await _availabilityService.IsSlotAvailableAsync(
             dto.BranchId, dto.AppointmentDate, dto.StartTime, endTime);
@@ -61,6 +78,15 @@ public class AppointmentService : IAppointmentService
             _logger.LogWarning("Time slot not available for branch {BranchId} on {Date} at {Time}", 
                 dto.BranchId, dto.AppointmentDate, dto.StartTime);
             throw new ConflictException("The selected time slot is not available. Please choose another time.");
+        }
+
+        // Auto-assign an available consultant
+        var consultantId = await FindAvailableConsultantAsync(dto.BranchId, dto.AppointmentDate, dto.StartTime, endTime);
+        if (consultantId == null)
+        {
+            _logger.LogWarning("No available consultant for branch {BranchId} on {Date} at {Time}", 
+                dto.BranchId, dto.AppointmentDate, dto.StartTime);
+            throw new ConflictException("No consultants are available at the selected time. Please choose another time.");
         }
 
         // Find or create customer
@@ -89,6 +115,7 @@ public class AppointmentService : IAppointmentService
             CustomerId = customer.Id,
             BranchId = dto.BranchId,
             ServiceId = dto.ServiceId,
+            ConsultantId = consultantId,
             AppointmentDate = dto.AppointmentDate,
             StartTime = dto.StartTime,
             EndTime = endTime,
@@ -100,8 +127,8 @@ public class AppointmentService : IAppointmentService
         await _unitOfWork.Appointments.AddAsync(appointment);
         await _unitOfWork.SaveChangesAsync();
 
-        _logger.LogInformation("Appointment created successfully with confirmation code: {ConfirmationCode}", 
-            appointment.ConfirmationCode);
+        _logger.LogInformation("Appointment created successfully with confirmation code: {ConfirmationCode}, assigned to consultant: {ConsultantId}", 
+            appointment.ConfirmationCode, consultantId);
 
         // Send confirmation notification
         try
@@ -114,12 +141,115 @@ public class AppointmentService : IAppointmentService
                 appointment.ConfirmationCode);
         }
 
-        var createdAppointment = await _unitOfWork.Appointments.GetByIdAsync(appointment.Id);
-        return _mapper.Map<AppointmentDto>(createdAppointment);
+        // Return the appointment with all navigation properties loaded
+        return await GetAppointmentByConfirmationCodeAsync(appointment.ConfirmationCode) 
+            ?? throw new InvalidOperationException("Failed to retrieve created appointment");
     }
 
     /// <summary>
-    /// Get appointment by ID
+    /// Validates that the start time is on a 15-minute increment (00, 15, 30, 45)
+    /// </summary>
+    private void ValidateSlotIncrement(TimeSpan startTime)
+    {
+        if (startTime.Minutes % DefaultSlotDurationMinutes != 0 || startTime.Seconds != 0)
+        {
+            _logger.LogWarning("Invalid slot time: {StartTime}. Must be on 15-minute increments.", startTime);
+            throw new ValidationException($"Appointment time must be on {DefaultSlotDurationMinutes}-minute increments (e.g., 09:00, 09:15, 09:30, 09:45).");
+        }
+    }
+
+    /// <summary>
+    /// Validates that the appointment falls within operating hours
+    /// </summary>
+    private async Task ValidateOperatingHoursAsync(int branchId, DateTime date, TimeSpan startTime, TimeSpan endTime)
+    {
+        // Get branch operating hours for the specific day
+        var operatingHours = await _unitOfWork.BranchOperatingHours.FindAsync(
+            h => h.BranchId == branchId && h.DayOfWeek == date.DayOfWeek);
+        var hours = operatingHours.FirstOrDefault();
+
+        // Use branch-specific hours if available, otherwise use defaults
+        var openTime = hours?.IsClosed == false ? hours.OpenTime : DefaultOpenTime;
+        var closeTime = hours?.IsClosed == false ? hours.CloseTime : DefaultCloseTime;
+
+        // Check if branch is closed on this day
+        if (hours?.IsClosed == true)
+        {
+            _logger.LogWarning("Branch {BranchId} is closed on {DayOfWeek}", branchId, date.DayOfWeek);
+            throw new ValidationException($"The branch is closed on {date.DayOfWeek}. Please select a different day.");
+        }
+
+        // Validate against operating hours
+        if (startTime < openTime || endTime > closeTime)
+        {
+            _logger.LogWarning("Appointment time {StartTime}-{EndTime} outside operating hours {OpenTime}-{CloseTime}", 
+                startTime, endTime, openTime, closeTime);
+            throw new ValidationException($"Appointments are only available during operating hours ({openTime:hh\\:mm} - {closeTime:hh\\:mm}).");
+        }
+    }
+
+    /// <summary>
+    /// Checks if a booking already exists for the same branch, date, and start time
+    /// </summary>
+    private async Task ValidateNoDoubleBookingAsync(int branchId, DateTime date, TimeSpan startTime)
+    {
+        var existingAppointments = await _unitOfWork.Appointments.FindAsync(a =>
+            a.BranchId == branchId &&
+            a.AppointmentDate == date &&
+            a.StartTime == startTime &&
+            a.Status != AppointmentStatus.Cancelled);
+
+        if (existingAppointments.Any())
+        {
+            _logger.LogWarning("Double booking detected for branch {BranchId} on {Date} at {Time}", 
+                branchId, date, startTime);
+            throw new ConflictException("This time slot is already booked. Please choose another time.");
+        }
+    }
+
+    /// <summary>
+    /// Finds an available consultant for the given time slot using robust overlap detection.
+    /// A consultant is available if they have no overlapping appointments:
+    /// existing.Start < requestedEnd AND requestedStart < (existing.End or existing.Start + duration)
+    /// </summary>
+    private async Task<int?> FindAvailableConsultantAsync(int branchId, DateTime date, TimeSpan requestedStart, TimeSpan requestedEnd)
+    {
+        // Get all active consultants for this branch
+        var consultants = await _unitOfWork.Consultants.FindAsync(c => c.BranchId == branchId && c.IsActive);
+        
+        if (!consultants.Any())
+        {
+            _logger.LogWarning("No consultants found for branch {BranchId}", branchId);
+            return null;
+        }
+
+        foreach (var consultant in consultants)
+        {
+            // Check for overlapping appointments for this consultant
+            // Note: The fallback to DefaultSlotDurationMinutes is only for legacy/malformed data
+            // where EndTime might not be set. All properly created appointments have EndTime set.
+            var overlappingAppointments = await _unitOfWork.Appointments.FindAsync(a =>
+                a.ConsultantId == consultant.Id &&
+                a.AppointmentDate == date &&
+                a.Status != AppointmentStatus.Cancelled &&
+                // Overlap detection: existing.Start < requestedEnd && requestedStart < existing.End
+                a.StartTime < requestedEnd && 
+                requestedStart < (a.EndTime != TimeSpan.Zero ? a.EndTime : a.StartTime.Add(TimeSpan.FromMinutes(DefaultSlotDurationMinutes))));
+
+            if (!overlappingAppointments.Any())
+            {
+                _logger.LogDebug("Found available consultant {ConsultantId} for branch {BranchId}", consultant.Id, branchId);
+                return consultant.Id;
+            }
+        }
+
+        _logger.LogDebug("No available consultants found for branch {BranchId} at {Date} {StartTime}-{EndTime}", 
+            branchId, date, requestedStart, requestedEnd);
+        return null;
+    }
+
+    /// <summary>
+    /// Get appointment by ID with navigation properties loaded
     /// </summary>
     public async Task<AppointmentDto?> GetAppointmentByIdAsync(int id)
     {
@@ -133,11 +263,12 @@ public class AppointmentService : IAppointmentService
             return null;
         }
 
-        return _mapper.Map<AppointmentDto>(appointment);
+        // Load navigation properties
+        return await BuildAppointmentDtoWithNavigationPropertiesAsync(appointment);
     }
 
     /// <summary>
-    /// Get appointment by unique confirmation code
+    /// Get appointment by unique confirmation code with all navigation properties loaded
     /// </summary>
     public async Task<AppointmentDto?> GetAppointmentByConfirmationCodeAsync(string confirmationCode)
     {
@@ -153,18 +284,69 @@ public class AppointmentService : IAppointmentService
             return null;
         }
 
-        return _mapper.Map<AppointmentDto>(appointment);
+        // Load navigation properties explicitly
+        return await BuildAppointmentDtoWithNavigationPropertiesAsync(appointment);
+    }
+
+    /// <summary>
+    /// Builds AppointmentDto by loading all navigation properties (Branch, Service, Customer, Consultant)
+    /// </summary>
+    private async Task<AppointmentDto> BuildAppointmentDtoWithNavigationPropertiesAsync(Appointment appointment)
+    {
+        var dto = _mapper.Map<AppointmentDto>(appointment);
+
+        // Load Branch
+        var branch = await _unitOfWork.Branches.GetByIdAsync(appointment.BranchId);
+        if (branch != null)
+        {
+            dto.Branch = _mapper.Map<BranchDto>(branch);
+        }
+
+        // Load Service
+        var service = await _unitOfWork.Services.GetByIdAsync(appointment.ServiceId);
+        if (service != null)
+        {
+            dto.Service = _mapper.Map<ServiceDto>(service);
+        }
+
+        // Load Customer
+        var customer = await _unitOfWork.Customers.GetByIdAsync(appointment.CustomerId);
+        if (customer != null)
+        {
+            dto.Customer = _mapper.Map<CustomerDto>(customer);
+        }
+
+        // Load Consultant if assigned
+        if (appointment.ConsultantId.HasValue)
+        {
+            var consultant = await _unitOfWork.Consultants.GetByIdAsync(appointment.ConsultantId.Value);
+            if (consultant != null)
+            {
+                dto.Consultant = _mapper.Map<ConsultantDto>(consultant);
+            }
+        }
+
+        return dto;
     }
 
     /// <summary>
     /// Get all appointments
+    /// Note: This method has N+1 query performance characteristics. For large datasets,
+    /// consider implementing eager loading in the repository layer using Include().
     /// </summary>
     public async Task<IEnumerable<AppointmentDto>> GetAllAppointmentsAsync()
     {
         _logger.LogDebug("Retrieving all appointments");
 
         var appointments = await _unitOfWork.Appointments.GetAllAsync();
-        return _mapper.Map<IEnumerable<AppointmentDto>>(appointments);
+        var result = new List<AppointmentDto>();
+        
+        foreach (var appointment in appointments)
+        {
+            result.Add(await BuildAppointmentDtoWithNavigationPropertiesAsync(appointment));
+        }
+        
+        return result;
     }
 
     /// <summary>
@@ -184,7 +366,14 @@ public class AppointmentService : IAppointmentService
         }
 
         var appointments = await _unitOfWork.Appointments.FindAsync(a => a.CustomerId == customer.Id);
-        return _mapper.Map<IEnumerable<AppointmentDto>>(appointments);
+        var result = new List<AppointmentDto>();
+        
+        foreach (var appointment in appointments)
+        {
+            result.Add(await BuildAppointmentDtoWithNavigationPropertiesAsync(appointment));
+        }
+        
+        return result;
     }
 
     /// <summary>
@@ -195,7 +384,14 @@ public class AppointmentService : IAppointmentService
         _logger.LogDebug("Retrieving appointments for branch: {BranchId}", branchId);
 
         var appointments = await _unitOfWork.Appointments.FindAsync(a => a.BranchId == branchId);
-        return _mapper.Map<IEnumerable<AppointmentDto>>(appointments);
+        var result = new List<AppointmentDto>();
+        
+        foreach (var appointment in appointments)
+        {
+            result.Add(await BuildAppointmentDtoWithNavigationPropertiesAsync(appointment));
+        }
+        
+        return result;
     }
 
     /// <summary>
@@ -223,7 +419,7 @@ public class AppointmentService : IAppointmentService
         await _unitOfWork.SaveChangesAsync();
 
         _logger.LogInformation("Appointment updated successfully: {AppointmentId}", dto.Id);
-        return _mapper.Map<AppointmentDto>(appointment);
+        return await BuildAppointmentDtoWithNavigationPropertiesAsync(appointment);
     }
 
     /// <summary>

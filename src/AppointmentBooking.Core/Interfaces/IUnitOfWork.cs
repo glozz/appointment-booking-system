@@ -15,6 +15,7 @@ public interface IUnitOfWork : IDisposable
     IRepository<ActivityLog> ActivityLogs { get; }
     IRepository<Notification> Notifications { get; }
     IRepository<AppointmentType> AppointmentTypes { get; }
+    IRepository<Consultant> Consultants { get; }
     
     Task<int> SaveChangesAsync();
 }

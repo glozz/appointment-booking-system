@@ -45,7 +45,8 @@
 
                         <div class="mb-3">
                             <label asp-for="StartTime" class="form-label">Time</label>
-                            <input asp-for="StartTime" type="time" class="form-control" required />
+                            <input asp-for="StartTime" type="time" class="form-control" required step="900" min="08:00" max="16:45" />
+                            <small class="text-muted">Operating hours: 08:00 - 17:00 (15-minute slots)</small>
                         </div>
 
                         <div class="mb-3">
@@ -55,26 +56,27 @@
 
                         <hr class="my-4" />
                         <h4 class="mb-3">Your Information</h4>
+                        <p class="text-muted small">Pre-filled from your account details</p>
 
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label asp-for="Customer.FirstName" class="form-label">First Name</label>
-                                <input asp-for="Customer.FirstName" class="form-control" required maxlength="50" />
+                                <input asp-for="Customer.FirstName" class="form-control" readonly maxlength="50" />
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label asp-for="Customer.LastName" class="form-label">Last Name</label>
-                                <input asp-for="Customer.LastName" class="form-control" required maxlength="50" />
+                                <input asp-for="Customer.LastName" class="form-control" readonly maxlength="50" />
                             </div>
                         </div>
 
                         <div class="mb-3">
                             <label asp-for="Customer.Email" class="form-label">Email</label>
-                            <input asp-for="Customer.Email" type="email" class="form-control" required />
+                            <input asp-for="Customer.Email" type="email" class="form-control" readonly />
                         </div>
 
                         <div class="mb-3">
                             <label asp-for="Customer.Phone" class="form-label">Phone</label>
-                            <input asp-for="Customer.Phone" type="tel" class="form-control" required />
+                            <input asp-for="Customer.Phone" type="tel" class="form-control" readonly />
                         </div>
 
                         <div class="d-grid">

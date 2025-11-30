@@ -27,6 +27,7 @@ public class UnitOfWork : IUnitOfWork
         ActivityLogs = new Repository<ActivityLog>(_context);
         Notifications = new Repository<Notification>(_context);
         AppointmentTypes = new Repository<AppointmentType>(_context);
+        Consultants = new Repository<Consultant>(_context);
     }
 
     public IRepository<Appointment> Appointments { get; }
@@ -40,6 +41,7 @@ public class UnitOfWork : IUnitOfWork
     public IRepository<ActivityLog> ActivityLogs { get; }
     public IRepository<Notification> Notifications { get; }
     public IRepository<AppointmentType> AppointmentTypes { get; }
+    public IRepository<Consultant> Consultants { get; }
 
     public async Task<int> SaveChangesAsync()
     {

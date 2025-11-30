@@ -28,5 +28,9 @@ public class AutoMapperProfile : Profile
         // Customer mappings
         CreateMap<Customer, CustomerDto>();
         CreateMap<CustomerDto, Customer>();
+
+        // Consultant mappings
+        CreateMap<Consultant, ConsultantDto>();
+        CreateMap<ConsultantDto, Consultant>();
     }
 }
