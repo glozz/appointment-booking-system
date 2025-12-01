@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore.Storage;
 using AppointmentBooking.Core.Entities;
 using AppointmentBooking.Core.Interfaces;
 using AppointmentBooking.Infrastructure.Data;
@@ -10,13 +11,14 @@ namespace AppointmentBooking.Infrastructure.Repositories;
 public class UnitOfWork : IUnitOfWork
 {
     private readonly AppDbContext _context;
+    private IDbContextTransaction? _currentTransaction;
 
     public UnitOfWork(AppDbContext context)
     {
         _context = context;
         
         // Initialize all repositories
-        Appointments = new Repository<Appointment>(_context);
+        Appointments = new AppointmentRepository(_context);
         Branches = new Repository<Branch>(_context);
         Customers = new Repository<Customer>(_context);
         Services = new Repository<Service>(_context);
@@ -30,7 +32,7 @@ public class UnitOfWork : IUnitOfWork
         Consultants = new Repository<Consultant>(_context);
     }
 
-    public IRepository<Appointment> Appointments { get; }
+    public IAppointmentRepository Appointments { get; }
     public IRepository<Branch> Branches { get; }
     public IRepository<Customer> Customers { get; }
     public IRepository<Service> Services { get; }
@@ -47,9 +49,59 @@ public class UnitOfWork : IUnitOfWork
     {
         return await _context.SaveChangesAsync();
     }
+    
+    /// <inheritdoc />
+    public async Task BeginTransactionAsync()
+    {
+        if (_currentTransaction != null)
+        {
+            throw new InvalidOperationException("A transaction is already in progress.");
+        }
+        _currentTransaction = await _context.Database.BeginTransactionAsync();
+    }
+    
+    /// <inheritdoc />
+    public async Task CommitTransactionAsync()
+    {
+        if (_currentTransaction == null)
+        {
+            throw new InvalidOperationException("No transaction is in progress.");
+        }
+        
+        try
+        {
+            await _context.SaveChangesAsync();
+            await _currentTransaction.CommitAsync();
+        }
+        finally
+        {
+            await _currentTransaction.DisposeAsync();
+            _currentTransaction = null;
+        }
+    }
+    
+    /// <inheritdoc />
+    public async Task RollbackTransactionAsync()
+    {
+        if (_currentTransaction == null)
+        {
+            throw new InvalidOperationException("No transaction is in progress.");
+        }
+        
+        try
+        {
+            await _currentTransaction.RollbackAsync();
+        }
+        finally
+        {
+            await _currentTransaction.DisposeAsync();
+            _currentTransaction = null;
+        }
+    }
 
     public void Dispose()
     {
+        _currentTransaction?.Dispose();
         _context.Dispose();
     }
 }

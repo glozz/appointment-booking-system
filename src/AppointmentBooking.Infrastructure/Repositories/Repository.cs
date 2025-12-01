@@ -7,8 +7,8 @@ namespace AppointmentBooking.Infrastructure.Repositories;
 
 public class Repository<T> : IRepository<T> where T : class
 {
-    private readonly AppDbContext _context;
-    private readonly DbSet<T> _dbSet;
+    protected readonly AppDbContext _context;
+    protected readonly DbSet<T> _dbSet;
 
     public Repository(AppDbContext context)
     {
@@ -47,5 +47,25 @@ public class Repository<T> : IRepository<T> where T : class
     {
         _dbSet.Remove(entity);
         return Task.CompletedTask;
+    }
+    
+    /// <inheritdoc />
+    public IQueryable<T> Query()
+    {
+        return _dbSet.AsQueryable();
+    }
+    
+    /// <inheritdoc />
+    public async Task<T?> GetByIdWithIncludesAsync(int id, params Expression<Func<T, object>>[] includes)
+    {
+        IQueryable<T> query = _dbSet;
+        
+        foreach (var include in includes)
+        {
+            query = query.Include(include);
+        }
+        
+        // Assumes the entity has an "Id" property; use reflection or convention
+        return await query.FirstOrDefaultAsync(e => EF.Property<int>(e, "Id") == id);
     }
 }
