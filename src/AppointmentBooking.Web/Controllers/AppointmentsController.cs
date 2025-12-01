@@ -60,6 +60,12 @@ public class AppointmentsController : Controller
 
         try
         {
+
+            if (dto.Customer.Phone.StartsWith("0"))
+            {
+                dto.Customer.Phone = "+27" + dto.Customer.Phone.Substring(1);
+            }
+
             var appointment = await _appointmentService.CreateAppointmentAsync(dto);
             return RedirectToAction(nameof(Confirmation), new { code = appointment.ConfirmationCode });
         }

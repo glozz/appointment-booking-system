@@ -228,13 +228,21 @@ public class AppointmentService : IAppointmentService
             // Check for overlapping appointments for this consultant
             // Note: The fallback to DefaultSlotDurationMinutes is only for legacy/malformed data
             // where EndTime might not be set. All properly created appointments have EndTime set.
-            var overlappingAppointments = await _unitOfWork.Appointments.FindAsync(a =>
-                a.ConsultantId == consultant.Id &&
-                a.AppointmentDate == date &&
-                a.Status != AppointmentStatus.Cancelled &&
-                // Overlap detection: existing.Start < requestedEnd && requestedStart < existing.End
-                a.StartTime < requestedEnd && 
-                requestedStart < (a.EndTime != TimeSpan.Zero ? a.EndTime : a.StartTime.Add(TimeSpan.FromMinutes(DefaultSlotDurationMinutes))));
+            var candidateAppointments = await _unitOfWork.Appointments.FindAsync(a =>
+              a.ConsultantId == consultant.Id &&
+              a.AppointmentDate == date &&
+              a.Status != AppointmentStatus.Cancelled &&
+              a.StartTime < requestedEnd);
+
+            // Filter in memory with the complex logic
+            var overlappingAppointments = candidateAppointments.Where(a =>
+            {
+                var effectiveEndTime = a.EndTime != TimeSpan.Zero
+                    ? a.EndTime
+                    : a.StartTime.Add(TimeSpan.FromMinutes(DefaultSlotDurationMinutes));
+
+                return requestedStart < effectiveEndTime;
+            }).ToList();
 
             if (!overlappingAppointments.Any())
             {

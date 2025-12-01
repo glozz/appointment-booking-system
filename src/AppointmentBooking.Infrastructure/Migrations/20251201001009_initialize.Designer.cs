@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace AppointmentBooking.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20251130232537_AddConsultantAndBookingEnhancements")]
-    partial class AddConsultantAndBookingEnhancements
+    [Migration("20251201001009_initialize")]
+    partial class initialize
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
