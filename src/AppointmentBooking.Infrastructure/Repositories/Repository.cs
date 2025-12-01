@@ -56,6 +56,11 @@ public class Repository<T> : IRepository<T> where T : class
     }
     
     /// <inheritdoc />
+    /// <remarks>
+    /// This method assumes the entity has an integer property named "Id".
+    /// This is a common convention in EF Core. For entities with different
+    /// primary key names or types, consider using a specialized repository.
+    /// </remarks>
     public async Task<T?> GetByIdWithIncludesAsync(int id, params Expression<Func<T, object>>[] includes)
     {
         IQueryable<T> query = _dbSet;
@@ -65,7 +70,7 @@ public class Repository<T> : IRepository<T> where T : class
             query = query.Include(include);
         }
         
-        // Assumes the entity has an "Id" property; use reflection or convention
+        // Assumes the entity has an "Id" property - this is a common EF Core convention
         return await query.FirstOrDefaultAsync(e => EF.Property<int>(e, "Id") == id);
     }
 }

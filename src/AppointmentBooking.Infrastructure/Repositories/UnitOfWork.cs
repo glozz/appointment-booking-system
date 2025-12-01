@@ -51,11 +51,16 @@ public class UnitOfWork : IUnitOfWork
     }
     
     /// <inheritdoc />
+    /// <remarks>
+    /// Nested transactions are not supported. If a transaction is already in progress,
+    /// this will throw an InvalidOperationException. This is intentional to keep
+    /// transaction handling simple and avoid complex rollback scenarios.
+    /// </remarks>
     public async Task BeginTransactionAsync()
     {
         if (_currentTransaction != null)
         {
-            throw new InvalidOperationException("A transaction is already in progress.");
+            throw new InvalidOperationException("A transaction is already in progress. Nested transactions are not supported.");
         }
         _currentTransaction = await _context.Database.BeginTransactionAsync();
     }

@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using AutoMapper;
 using Microsoft.Extensions.Logging;
 using AppointmentBooking.Application.DTOs;
@@ -465,18 +466,19 @@ public class AppointmentService : IAppointmentService
     /// <summary>
     /// Generates a unique confirmation code with collision checking.
     /// Format: APT-YYYYMMDD-XXXXX (e.g., APT-20251122-A7B9K)
+    /// Uses cryptographically secure random generation for better uniqueness.
     /// </summary>
     /// <exception cref="InvalidOperationException">Thrown if unable to generate a unique code after max attempts.</exception>
     private async Task<string> GenerateUniqueConfirmationCodeAsync()
     {
         const int maxAttempts = 10;
-        var random = new Random();
         const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
         
         for (int attempt = 1; attempt <= maxAttempts; attempt++)
         {
-            var randomPart = new string(Enumerable.Repeat(chars, 5)
-                .Select(s => s[random.Next(s.Length)]).ToArray());
+            // Use cryptographically secure random for better uniqueness
+            var randomBytes = RandomNumberGenerator.GetBytes(5);
+            var randomPart = new string(randomBytes.Select(b => chars[b % chars.Length]).ToArray());
             
             var code = $"APT-{DateTime.UtcNow:yyyyMMdd}-{randomPart}";
             
