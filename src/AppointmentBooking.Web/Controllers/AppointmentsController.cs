@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using AppointmentBooking.Application.DTOs;
 using AppointmentBooking.Application.Interfaces;
 using AppointmentBooking.Core.Exceptions;
@@ -8,6 +9,21 @@ using AppointmentBooking.Core.Interfaces;
 
 namespace AppointmentBooking.Web.Controllers;
 
+/// <summary>
+/// Controller for managing appointments. Requires authentication.
+/// 
+/// Customer vs User Relationship:
+/// - User: An authenticated account in the system (registered user with login credentials)
+/// - Customer: A person who books appointments (may or may not have a User account)
+/// 
+/// When a logged-in User books an appointment:
+/// 1. The User's email is used to find or create a Customer record
+/// 2. If a Customer with that email exists, their data is used
+/// 3. If not, a new Customer is created with User details from claims
+/// 
+/// Security Note: The authenticated user's email is retrieved from claims (JWT/cookies),
+/// not from user input, preventing users from accessing other customers' data.
+/// </summary>
 [Authorize]
 public class AppointmentsController : Controller
 {
@@ -16,19 +32,22 @@ public class AppointmentsController : Controller
     private readonly IServiceService _serviceService;
     private readonly IAvailabilityService _availabilityService;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ILogger<AppointmentsController> _logger;
 
     public AppointmentsController(
         IAppointmentService appointmentService,
         IBranchService branchService,
         IServiceService serviceService,
         IAvailabilityService availabilityService,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        ILogger<AppointmentsController> logger)
     {
         _appointmentService = appointmentService;
         _branchService = branchService;
         _serviceService = serviceService;
         _availabilityService = availabilityService;
         _unitOfWork = unitOfWork;
+        _logger = logger;
     }
 
     public async Task<IActionResult> Book()
@@ -86,38 +105,63 @@ public class AppointmentsController : Controller
     }
 
     /// <summary>
-    /// Gets the customer DTO from the logged-in user's claims
+    /// Retrieves customer information from the authenticated user's claims and existing records.
+    /// 
+    /// Security: This method ONLY uses the email from authenticated claims, not from user input.
+    /// This ensures users can only access their own customer data.
+    /// 
+    /// Flow:
+    /// 1. Get authenticated user's email from JWT/cookie claims
+    /// 2. Check if a Customer record exists with that email
+    /// 3. If Customer exists, use that data (may have more complete info like phone)
+    /// 4. If not, fall back to User record for additional details
+    /// 5. Return CustomerDto with available data
     /// </summary>
     private async Task<CustomerDto> GetLoggedInUserCustomerDtoAsync()
     {
-        var email = User.FindFirstValue(ClaimTypes.Email) ?? string.Empty;
+        // SECURITY: Email is retrieved from authenticated claims, not user input
+        var authenticatedEmail = User.FindFirstValue(ClaimTypes.Email) ?? string.Empty;
         var firstName = User.FindFirstValue(ClaimTypes.GivenName) ?? string.Empty;
         var lastName = User.FindFirstValue(ClaimTypes.Surname) ?? string.Empty;
         
-        // Try to get additional info (like phone) from existing customer record
-        var phone = string.Empty;
-        if (!string.IsNullOrEmpty(email))
+        if (string.IsNullOrEmpty(authenticatedEmail))
         {
-            var customers = await _unitOfWork.Customers.FindAsync(c => c.Email == email);
-            var existingCustomer = customers.FirstOrDefault();
-            if (existingCustomer != null)
+            _logger.LogWarning("Authenticated user has no email claim. User identity: {Identity}", 
+                User.Identity?.Name ?? "unknown");
+            return new CustomerDto
             {
-                // Use existing customer data if found
-                firstName = !string.IsNullOrEmpty(firstName) ? firstName : existingCustomer.FirstName;
-                lastName = !string.IsNullOrEmpty(lastName) ? lastName : existingCustomer.LastName;
-                phone = existingCustomer.Phone;
-            }
-            else
+                FirstName = firstName,
+                LastName = lastName,
+                Email = string.Empty,
+                Phone = string.Empty
+            };
+        }
+        
+        _logger.LogDebug("Retrieving customer data for authenticated user: {Email}", authenticatedEmail);
+        
+        var phone = string.Empty;
+        
+        // First, try to get data from existing Customer record
+        var customers = await _unitOfWork.Customers.FindAsync(c => c.Email == authenticatedEmail);
+        var existingCustomer = customers.FirstOrDefault();
+        
+        if (existingCustomer != null)
+        {
+            // Use existing customer data - it may have more complete information
+            firstName = !string.IsNullOrEmpty(firstName) ? firstName : existingCustomer.FirstName;
+            lastName = !string.IsNullOrEmpty(lastName) ? lastName : existingCustomer.LastName;
+            phone = existingCustomer.Phone;
+        }
+        else
+        {
+            // Fall back to User record for additional details (like phone)
+            var users = await _unitOfWork.Users.FindAsync(u => u.Email == authenticatedEmail);
+            var user = users.FirstOrDefault();
+            if (user != null)
             {
-                // If no existing customer, try to get phone from User record
-                var users = await _unitOfWork.Users.FindAsync(u => u.Email == email);
-                var user = users.FirstOrDefault();
-                if (user != null)
-                {
-                    phone = user.Phone ?? string.Empty;
-                    firstName = !string.IsNullOrEmpty(firstName) ? firstName : user.FirstName;
-                    lastName = !string.IsNullOrEmpty(lastName) ? lastName : user.LastName;
-                }
+                phone = user.Phone ?? string.Empty;
+                firstName = !string.IsNullOrEmpty(firstName) ? firstName : user.FirstName;
+                lastName = !string.IsNullOrEmpty(lastName) ? lastName : user.LastName;
             }
         }
         
@@ -125,7 +169,7 @@ public class AppointmentsController : Controller
         {
             FirstName = firstName,
             LastName = lastName,
-            Email = email,
+            Email = authenticatedEmail,
             Phone = phone
         };
     }

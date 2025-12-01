@@ -4,7 +4,10 @@ namespace AppointmentBooking.Core.Interfaces;
 
 public interface IUnitOfWork : IDisposable
 {
-    IRepository<Appointment> Appointments { get; }
+    /// <summary>
+    /// Specialized appointment repository with optimized queries for eager loading.
+    /// </summary>
+    IAppointmentRepository Appointments { get; }
     IRepository<Branch> Branches { get; }
     IRepository<Customer> Customers { get; }
     IRepository<Service> Services { get; }
@@ -18,4 +21,19 @@ public interface IUnitOfWork : IDisposable
     IRepository<Consultant> Consultants { get; }
     
     Task<int> SaveChangesAsync();
+    
+    /// <summary>
+    /// Begins a database transaction.
+    /// </summary>
+    Task BeginTransactionAsync();
+    
+    /// <summary>
+    /// Commits the current database transaction.
+    /// </summary>
+    Task CommitTransactionAsync();
+    
+    /// <summary>
+    /// Rolls back the current database transaction.
+    /// </summary>
+    Task RollbackTransactionAsync();
 }

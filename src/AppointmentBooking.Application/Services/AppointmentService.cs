@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using AutoMapper;
 using Microsoft.Extensions.Logging;
 using AppointmentBooking.Application.DTOs;
@@ -89,61 +90,78 @@ public class AppointmentService : IAppointmentService
             throw new ConflictException("No consultants are available at the selected time. Please choose another time.");
         }
 
-        // Find or create customer
-        var customers = await _unitOfWork.Customers.FindAsync(c => c.Email == dto.Customer.Email);
-        var customer = customers.FirstOrDefault();
+        // Begin transaction to ensure customer and appointment are created atomically
+        await _unitOfWork.BeginTransactionAsync();
         
-        if (customer == null)
-        {
-            _logger.LogInformation("Creating new customer: {Email}", dto.Customer.Email);
-            customer = new Customer
-            {
-                FirstName = dto.Customer.FirstName,
-                LastName = dto.Customer.LastName,
-                Email = dto.Customer.Email,
-                Phone = dto.Customer.Phone,
-                CreatedAt = DateTime.UtcNow
-            };
-            await _unitOfWork.Customers.AddAsync(customer);
-            await _unitOfWork.SaveChangesAsync();
-        }
-
-        // Create appointment with unique confirmation code
-        var appointment = new Appointment
-        {
-            ConfirmationCode = GenerateConfirmationCode(),
-            CustomerId = customer.Id,
-            BranchId = dto.BranchId,
-            ServiceId = dto.ServiceId,
-            ConsultantId = consultantId,
-            AppointmentDate = dto.AppointmentDate,
-            StartTime = dto.StartTime,
-            EndTime = endTime,
-            Status = AppointmentStatus.Confirmed,
-            Notes = dto.Notes,
-            CreatedAt = DateTime.UtcNow
-        };
-
-        await _unitOfWork.Appointments.AddAsync(appointment);
-        await _unitOfWork.SaveChangesAsync();
-
-        _logger.LogInformation("Appointment created successfully with confirmation code: {ConfirmationCode}, assigned to consultant: {ConsultantId}", 
-            appointment.ConfirmationCode, consultantId);
-
-        // Send confirmation notification
         try
         {
-            await _notificationService.SendAppointmentConfirmationAsync(appointment);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to send confirmation notification for appointment: {ConfirmationCode}", 
-                appointment.ConfirmationCode);
-        }
+            // Find or create customer
+            var customers = await _unitOfWork.Customers.FindAsync(c => c.Email == dto.Customer.Email);
+            var customer = customers.FirstOrDefault();
+            
+            if (customer == null)
+            {
+                _logger.LogInformation("Creating new customer: {Email}", dto.Customer.Email);
+                customer = new Customer
+                {
+                    FirstName = dto.Customer.FirstName,
+                    LastName = dto.Customer.LastName,
+                    Email = dto.Customer.Email,
+                    Phone = dto.Customer.Phone,
+                    CreatedAt = DateTime.UtcNow
+                };
+                await _unitOfWork.Customers.AddAsync(customer);
+                await _unitOfWork.SaveChangesAsync();
+            }
 
-        // Return the appointment with all navigation properties loaded
-        return await GetAppointmentByConfirmationCodeAsync(appointment.ConfirmationCode) 
-            ?? throw new InvalidOperationException("Failed to retrieve created appointment");
+            // Generate unique confirmation code with collision checking
+            var confirmationCode = await GenerateUniqueConfirmationCodeAsync();
+
+            // Create appointment with unique confirmation code
+            var appointment = new Appointment
+            {
+                ConfirmationCode = confirmationCode,
+                CustomerId = customer.Id,
+                BranchId = dto.BranchId,
+                ServiceId = dto.ServiceId,
+                ConsultantId = consultantId,
+                AppointmentDate = dto.AppointmentDate,
+                StartTime = dto.StartTime,
+                EndTime = endTime,
+                Status = AppointmentStatus.Confirmed,
+                Notes = dto.Notes,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await _unitOfWork.Appointments.AddAsync(appointment);
+            
+            // Commit transaction - both customer and appointment are saved together
+            await _unitOfWork.CommitTransactionAsync();
+
+            _logger.LogInformation("Appointment created successfully with confirmation code: {ConfirmationCode}, assigned to consultant: {ConsultantId}", 
+                appointment.ConfirmationCode, consultantId);
+
+            // Send confirmation notification
+            try
+            {
+                await _notificationService.SendAppointmentConfirmationAsync(appointment);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send confirmation notification for appointment: {ConfirmationCode}", 
+                    appointment.ConfirmationCode);
+            }
+
+            // Return the appointment with all navigation properties loaded
+            return await GetAppointmentByConfirmationCodeAsync(appointment.ConfirmationCode) 
+                ?? throw new InvalidOperationException("Failed to retrieve created appointment");
+        }
+        catch
+        {
+            // Rollback transaction if any error occurs
+            await _unitOfWork.RollbackTransactionAsync();
+            throw;
+        }
     }
 
     /// <summary>
@@ -257,13 +275,14 @@ public class AppointmentService : IAppointmentService
     }
 
     /// <summary>
-    /// Get appointment by ID with navigation properties loaded
+    /// Get appointment by ID with navigation properties loaded using optimized eager loading
     /// </summary>
     public async Task<AppointmentDto?> GetAppointmentByIdAsync(int id)
     {
         _logger.LogDebug("Retrieving appointment with ID: {AppointmentId}", id);
 
-        var appointment = await _unitOfWork.Appointments.GetByIdAsync(id);
+        // Use specialized repository method with eager loading
+        var appointment = await _unitOfWork.Appointments.GetByIdWithIncludesAsync(id);
         
         if (appointment == null)
         {
@@ -271,12 +290,12 @@ public class AppointmentService : IAppointmentService
             return null;
         }
 
-        // Load navigation properties
-        return await BuildAppointmentDtoWithNavigationPropertiesAsync(appointment);
+        // Map directly - navigation properties are already loaded
+        return _mapper.Map<AppointmentDto>(appointment);
     }
 
     /// <summary>
-    /// Get appointment by unique confirmation code with all navigation properties loaded
+    /// Get appointment by unique confirmation code with all navigation properties loaded using optimized eager loading
     /// </summary>
     public async Task<AppointmentDto?> GetAppointmentByConfirmationCodeAsync(string confirmationCode)
     {
@@ -288,9 +307,8 @@ public class AppointmentService : IAppointmentService
 
         _logger.LogDebug("Retrieving appointment with confirmation code: {Code}", confirmationCode);
 
-        // Repository has no Query()/Include; use FindAsync then explicit load
-        var found = await _unitOfWork.Appointments.FindAsync(a => a.ConfirmationCode == confirmationCode);
-        var appointment = found.FirstOrDefault();
+        // Use specialized repository method with eager loading
+        var appointment = await _unitOfWork.Appointments.GetByConfirmationCodeWithIncludesAsync(confirmationCode);
 
         if (appointment == null)
         {
@@ -298,73 +316,27 @@ public class AppointmentService : IAppointmentService
             return null;
         }
 
-        // Load navigation properties explicitly
-        return await BuildAppointmentDtoWithNavigationPropertiesAsync(appointment);
+        // Map directly - navigation properties are already loaded
+        return _mapper.Map<AppointmentDto>(appointment);
     }
 
     /// <summary>
-    /// Builds AppointmentDto by loading all navigation properties (Branch, Service, Customer, Consultant)
-    /// </summary>
-    private async Task<AppointmentDto> BuildAppointmentDtoWithNavigationPropertiesAsync(Appointment appointment)
-    {
-        var dto = _mapper.Map<AppointmentDto>(appointment);
-
-        // Load Branch
-        var branch = await _unitOfWork.Branches.GetByIdAsync(appointment.BranchId);
-        if (branch != null)
-        {
-            dto.Branch = _mapper.Map<BranchDto>(branch);
-        }
-
-        // Load Service
-        var service = await _unitOfWork.Services.GetByIdAsync(appointment.ServiceId);
-        if (service != null)
-        {
-            dto.Service = _mapper.Map<ServiceDto>(service);
-        }
-
-        // Load Customer
-        var customer = await _unitOfWork.Customers.GetByIdAsync(appointment.CustomerId);
-        if (customer != null)
-        {
-            dto.Customer = _mapper.Map<CustomerDto>(customer);
-        }
-
-        // Load Consultant if assigned
-        if (appointment.ConsultantId.HasValue)
-        {
-            var consultant = await _unitOfWork.Consultants.GetByIdAsync(appointment.ConsultantId.Value);
-            if (consultant != null)
-            {
-                dto.Consultant = _mapper.Map<ConsultantDto>(consultant);
-            }
-        }
-
-        return dto;
-    }
-
-    /// <summary>
-    /// Get all appointments
-    /// Note: This method has N+1 query performance characteristics. For large datasets,
-    /// consider implementing eager loading in the repository layer using Include().
+    /// Get all appointments with navigation properties using optimized eager loading.
+    /// Uses a single database query instead of N+1 queries.
     /// </summary>
     public async Task<IEnumerable<AppointmentDto>> GetAllAppointmentsAsync()
     {
         _logger.LogDebug("Retrieving all appointments");
 
-        var appointments = await _unitOfWork.Appointments.GetAllAsync();
-        var result = new List<AppointmentDto>();
+        // Use specialized repository method with eager loading
+        var appointments = await _unitOfWork.Appointments.GetAllWithIncludesAsync();
         
-        foreach (var appointment in appointments)
-        {
-            result.Add(await BuildAppointmentDtoWithNavigationPropertiesAsync(appointment));
-        }
-        
-        return result;
+        // Map all appointments - navigation properties are already loaded
+        return _mapper.Map<IEnumerable<AppointmentDto>>(appointments);
     }
 
     /// <summary>
-    /// Get all appointments for a specific customer by email
+    /// Get all appointments for a specific customer by email using optimized eager loading
     /// </summary>
     public async Task<IEnumerable<AppointmentDto>> GetAppointmentsByCustomerEmailAsync(string email)
     {
@@ -379,33 +351,25 @@ public class AppointmentService : IAppointmentService
             return Enumerable.Empty<AppointmentDto>();
         }
 
-        var appointments = await _unitOfWork.Appointments.FindAsync(a => a.CustomerId == customer.Id);
-        var result = new List<AppointmentDto>();
+        // Use specialized repository method with eager loading
+        var appointments = await _unitOfWork.Appointments.GetByCustomerIdWithIncludesAsync(customer.Id);
         
-        foreach (var appointment in appointments)
-        {
-            result.Add(await BuildAppointmentDtoWithNavigationPropertiesAsync(appointment));
-        }
-        
-        return result;
+        // Map all appointments - navigation properties are already loaded
+        return _mapper.Map<IEnumerable<AppointmentDto>>(appointments);
     }
 
     /// <summary>
-    /// Get all appointments for a specific branch
+    /// Get all appointments for a specific branch using optimized eager loading
     /// </summary>
     public async Task<IEnumerable<AppointmentDto>> GetAppointmentsByBranchAsync(int branchId)
     {
         _logger.LogDebug("Retrieving appointments for branch: {BranchId}", branchId);
 
-        var appointments = await _unitOfWork.Appointments.FindAsync(a => a.BranchId == branchId);
-        var result = new List<AppointmentDto>();
+        // Use specialized repository method with eager loading
+        var appointments = await _unitOfWork.Appointments.GetByBranchIdWithIncludesAsync(branchId);
         
-        foreach (var appointment in appointments)
-        {
-            result.Add(await BuildAppointmentDtoWithNavigationPropertiesAsync(appointment));
-        }
-        
-        return result;
+        // Map all appointments - navigation properties are already loaded
+        return _mapper.Map<IEnumerable<AppointmentDto>>(appointments);
     }
 
     /// <summary>
@@ -433,7 +397,10 @@ public class AppointmentService : IAppointmentService
         await _unitOfWork.SaveChangesAsync();
 
         _logger.LogInformation("Appointment updated successfully: {AppointmentId}", dto.Id);
-        return await BuildAppointmentDtoWithNavigationPropertiesAsync(appointment);
+        
+        // Reload appointment with navigation properties for return
+        var updatedAppointment = await _unitOfWork.Appointments.GetByIdWithIncludesAsync(dto.Id);
+        return _mapper.Map<AppointmentDto>(updatedAppointment!);
     }
 
     /// <summary>
@@ -497,19 +464,38 @@ public class AppointmentService : IAppointmentService
     }
 
     /// <summary>
-    /// Generate unique confirmation code in format: APT-YYYYMMDD-XXXXX
-    /// Example: APT-20251122-A7B9K
+    /// Generates a unique confirmation code with collision checking.
+    /// Format: APT-YYYYMMDD-XXXXX (e.g., APT-20251122-A7B9K)
+    /// Uses cryptographically secure random generation for better uniqueness.
     /// </summary>
-    private string GenerateConfirmationCode()
+    /// <exception cref="InvalidOperationException">Thrown if unable to generate a unique code after max attempts.</exception>
+    private async Task<string> GenerateUniqueConfirmationCodeAsync()
     {
-        var random = new Random();
+        const int maxAttempts = 10;
         const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-        var randomPart = new string(Enumerable.Repeat(chars, 5)
-            .Select(s => s[random.Next(s.Length)]).ToArray());
         
-        var code = $"APT-{DateTime.UtcNow:yyyyMMdd}-{randomPart}";
+        for (int attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            // Use cryptographically secure random for better uniqueness
+            var randomBytes = RandomNumberGenerator.GetBytes(5);
+            var randomPart = new string(randomBytes.Select(b => chars[b % chars.Length]).ToArray());
+            
+            var code = $"APT-{DateTime.UtcNow:yyyyMMdd}-{randomPart}";
+            
+            // Check if code already exists in database
+            var exists = await _unitOfWork.Appointments.ConfirmationCodeExistsAsync(code);
+            
+            if (!exists)
+            {
+                _logger.LogDebug("Generated unique confirmation code: {ConfirmationCode} on attempt {Attempt}", code, attempt);
+                return code;
+            }
+            
+            _logger.LogDebug("Confirmation code collision detected for: {ConfirmationCode}, regenerating (attempt {Attempt}/{MaxAttempts})", 
+                code, attempt, maxAttempts);
+        }
         
-        _logger.LogDebug("Generated confirmation code: {ConfirmationCode}", code);
-        return code;
+        _logger.LogError("Failed to generate unique confirmation code after {MaxAttempts} attempts", maxAttempts);
+        throw new InvalidOperationException($"Unable to generate unique confirmation code after {maxAttempts} attempts. Please try again.");
     }
 }

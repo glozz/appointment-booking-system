@@ -115,7 +115,7 @@ public class AppointmentServiceTests
             }});
         _unitOfWorkMock.Setup(u => u.BranchOperatingHours).Returns(branchHoursRepoMock.Object);
 
-        var appointmentRepoMock = new Mock<IRepository<Appointment>>();
+        var appointmentRepoMock = new Mock<IAppointmentRepository>();
         appointmentRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<Appointment, bool>>>()))
             .ReturnsAsync(Enumerable.Empty<Appointment>());
         _unitOfWorkMock.Setup(u => u.Appointments).Returns(appointmentRepoMock.Object);
@@ -326,7 +326,7 @@ public class AppointmentServiceTests
         _unitOfWorkMock.Setup(u => u.BranchOperatingHours).Returns(branchHoursRepoMock.Object);
 
         // No double booking
-        var appointmentRepoMock = new Mock<IRepository<Appointment>>();
+        var appointmentRepoMock = new Mock<IAppointmentRepository>();
         var appointmentCallCount = 0;
         appointmentRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<Appointment, bool>>>()))
             .ReturnsAsync(() =>
@@ -415,10 +415,9 @@ public class AppointmentServiceTests
         _unitOfWorkMock.Setup(u => u.Branches).Returns(branchRepoMock.Object);
 
         Appointment? createdAppointment = null;
-        var appointmentRepoMock = new Mock<IRepository<Appointment>>();
+        var appointmentRepoMock = new Mock<IAppointmentRepository>();
         
         // For validation checks (double booking, consultant overlap), return empty
-        // For retrieval by confirmation code, return the created appointment
         appointmentRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<Appointment, bool>>>()))
             .ReturnsAsync((Expression<Func<Appointment, bool>> predicate) =>
             {
@@ -434,13 +433,31 @@ public class AppointmentServiceTests
 
         appointmentRepoMock.Setup(r => r.AddAsync(It.IsAny<Appointment>()))
             .Callback<Appointment>(a => { 
-                a.Id = 1; 
+                a.Id = 1;
+                a.Branch = branch;
+                a.Service = service;
+                a.Customer = customer;
+                a.Consultant = consultant;
                 createdAppointment = a; 
             })
             .ReturnsAsync((Appointment a) => a);
 
+        // Mock the specialized repository methods for retrieval with includes
+        // Use It.IsAny<string>() and check createdAppointment in the callback
+        appointmentRepoMock.Setup(r => r.GetByConfirmationCodeWithIncludesAsync(It.IsAny<string>()))
+            .ReturnsAsync(() => createdAppointment);
+        
+        // Mock confirmation code uniqueness check (no existing code)
+        appointmentRepoMock.Setup(r => r.ConfirmationCodeExistsAsync(It.IsAny<string>()))
+            .ReturnsAsync(false);
+
         _unitOfWorkMock.Setup(u => u.Appointments).Returns(appointmentRepoMock.Object);
         _unitOfWorkMock.Setup(u => u.SaveChangesAsync()).ReturnsAsync(1);
+        
+        // Mock transaction methods
+        _unitOfWorkMock.Setup(u => u.BeginTransactionAsync()).Returns(Task.CompletedTask);
+        _unitOfWorkMock.Setup(u => u.CommitTransactionAsync()).Returns(Task.CompletedTask);
+        _unitOfWorkMock.Setup(u => u.RollbackTransactionAsync()).Returns(Task.CompletedTask);
 
         // Act
         var result = await _appointmentService.CreateAppointmentAsync(dto);
@@ -494,7 +511,7 @@ public class AppointmentServiceTests
         _unitOfWorkMock.Setup(u => u.BranchOperatingHours).Returns(branchHoursRepoMock.Object);
 
         // Existing appointment at the same time slot
-        var appointmentRepoMock = new Mock<IRepository<Appointment>>();
+        var appointmentRepoMock = new Mock<IAppointmentRepository>();
         appointmentRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<Appointment, bool>>>()))
             .ReturnsAsync(new[] { new Appointment 
             { 
