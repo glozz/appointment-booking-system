@@ -27,7 +27,8 @@ public class AppointmentService : IAppointmentService
     private static readonly TimeSpan DefaultOpenTime = new TimeSpan(8, 0, 0);  // 08:00
     private static readonly TimeSpan DefaultCloseTime = new TimeSpan(17, 0, 0); // 17:00
 
-    // Note: Notification features are currently disabled
+    // Note: Notification features have been permanently removed as per requirements.
+    // The INotificationService dependency is no longer needed.
     public AppointmentService(
         IUnitOfWork unitOfWork,
         IMapper mapper,
@@ -141,8 +142,6 @@ public class AppointmentService : IAppointmentService
 
             _logger.LogInformation("Appointment created successfully with confirmation code: {ConfirmationCode}, assigned to consultant: {ConsultantId}", 
                 appointment.ConfirmationCode, consultantId);
-
-            // Note: Notification features are currently disabled
 
             // Return the appointment with all navigation properties loaded
             return await GetAppointmentByConfirmationCodeAsync(appointment.ConfirmationCode) 
@@ -664,8 +663,6 @@ public class AppointmentService : IAppointmentService
         await _unitOfWork.SaveChangesAsync();
 
         _logger.LogInformation("Appointment cancelled successfully: {AppointmentId}", id);
-
-        // Note: Notification features are currently disabled
 
         return true;
     }

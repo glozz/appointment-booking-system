@@ -328,15 +328,15 @@ public class AppointmentServiceTests
             .ReturnsAsync(Enumerable.Empty<Customer>()); // New customer
         _unitOfWorkMock.Setup(u => u.Customers).Returns(customerRepoMock.Object);
 
-        // No double booking, consultant overlap check
+        // Mock appointment repository - returns overlapping appointment for consultant making them unavailable
         var appointmentRepoMock = new Mock<IAppointmentRepository>();
         var appointmentCallCount = 0;
         appointmentRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<Appointment, bool>>>()))
             .ReturnsAsync(() =>
             {
                 appointmentCallCount++;
-                // First call is for double-booking check (return empty)
-                // Second call is for consultant overlap check (return overlapping appointment)
+                // First call is for double-booking check at branch (return empty)
+                // Second call is for consultant availability check (return overlapping appointment making them unavailable)
                 if (appointmentCallCount == 1)
                     return Enumerable.Empty<Appointment>();
                 else
