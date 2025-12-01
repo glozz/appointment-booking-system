@@ -18,7 +18,6 @@ public class AppointmentService : IAppointmentService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMapper _mapper;
     private readonly ILogger<AppointmentService> _logger;
-    private readonly INotificationService _notificationService;
     private readonly IAvailabilityService _availabilityService;
 
     // Default slot duration in minutes (configurable)
@@ -28,17 +27,16 @@ public class AppointmentService : IAppointmentService
     private static readonly TimeSpan DefaultOpenTime = new TimeSpan(8, 0, 0);  // 08:00
     private static readonly TimeSpan DefaultCloseTime = new TimeSpan(17, 0, 0); // 17:00
 
+    // Note: Notification features are currently disabled
     public AppointmentService(
         IUnitOfWork unitOfWork,
         IMapper mapper,
         ILogger<AppointmentService> logger,
-        INotificationService notificationService,
         IAvailabilityService availabilityService)
     {
         _unitOfWork = unitOfWork;
         _mapper = mapper;
         _logger = logger;
-        _notificationService = notificationService;
         _availabilityService = availabilityService;
     }
 
@@ -69,6 +67,9 @@ public class AppointmentService : IAppointmentService
 
         // Double-booking prevention: check if slot already exists for this branch
         await ValidateNoDoubleBookingAsync(dto.BranchId, dto.AppointmentDate, dto.StartTime);
+
+        // Customer cross-branch conflict detection: prevent same customer from booking at overlapping times
+        await ValidateCustomerAvailabilityAsync(dto.Customer.Email, dto.BranchId, dto.AppointmentDate, dto.StartTime, endTime);
 
         // Check slot availability (conflict detection + lead time validation)
         var isAvailable = await _availabilityService.IsSlotAvailableAsync(
@@ -141,16 +142,7 @@ public class AppointmentService : IAppointmentService
             _logger.LogInformation("Appointment created successfully with confirmation code: {ConfirmationCode}, assigned to consultant: {ConsultantId}", 
                 appointment.ConfirmationCode, consultantId);
 
-            // Send confirmation notification
-            try
-            {
-                await _notificationService.SendAppointmentConfirmationAsync(appointment);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to send confirmation notification for appointment: {ConfirmationCode}", 
-                    appointment.ConfirmationCode);
-            }
+            // Note: Notification features are currently disabled
 
             // Return the appointment with all navigation properties loaded
             return await GetAppointmentByConfirmationCodeAsync(appointment.ConfirmationCode) 
@@ -222,6 +214,54 @@ public class AppointmentService : IAppointmentService
             _logger.LogWarning("Double booking detected for branch {BranchId} on {Date} at {Time}", 
                 branchId, date, startTime);
             throw new ConflictException("This time slot is already booked. Please choose another time.");
+        }
+    }
+
+    /// <summary>
+    /// Validates that the customer does not have an overlapping appointment at any branch.
+    /// A customer cannot be in two places at the same time.
+    /// </summary>
+    private async Task ValidateCustomerAvailabilityAsync(string customerEmail, int requestedBranchId, DateTime date, TimeSpan requestedStart, TimeSpan requestedEnd)
+    {
+        // Get customer by email
+        var customers = await _unitOfWork.Customers.FindAsync(c => c.Email == customerEmail);
+        var customer = customers.FirstOrDefault();
+        
+        if (customer == null)
+        {
+            // New customer, no conflicts possible
+            return;
+        }
+
+        // Find appointments where customer has overlapping times at any branch
+        var candidateAppointments = await _unitOfWork.Appointments.FindAsync(a =>
+            a.CustomerId == customer.Id &&
+            a.AppointmentDate == date &&
+            a.Status != AppointmentStatus.Cancelled &&
+            a.StartTime < requestedEnd);
+
+        // Filter in memory with overlap logic
+        var overlappingAppointments = candidateAppointments.Where(a =>
+        {
+            var effectiveEndTime = a.EndTime != TimeSpan.Zero
+                ? a.EndTime
+                : a.StartTime.Add(TimeSpan.FromMinutes(DefaultSlotDurationMinutes));
+
+            return requestedStart < effectiveEndTime;
+        }).ToList();
+
+        if (overlappingAppointments.Any())
+        {
+            var existingAppointment = overlappingAppointments.First();
+            
+            // Load branch info for the error message
+            var branch = await _unitOfWork.Branches.GetByIdAsync(existingAppointment.BranchId);
+            var branchName = branch?.Name ?? "another branch";
+            
+            _logger.LogWarning("Customer {Email} already has appointment at {BranchName} on {Date} at {Time}",
+                customerEmail, branchName, date, existingAppointment.StartTime);
+            
+            throw new ConflictException($"You already have an appointment at {branchName} on {date:MMMM d, yyyy} at {existingAppointment.StartTime:hh\\:mm}. Please choose a different time or cancel your existing appointment.");
         }
     }
 
@@ -372,6 +412,205 @@ public class AppointmentService : IAppointmentService
         return _mapper.Map<IEnumerable<AppointmentDto>>(appointments);
     }
 
+    #region Consultant Appointment Views
+
+    /// <summary>
+    /// Get upcoming appointments for a consultant (today and future, ordered by date/time ASC)
+    /// </summary>
+    public async Task<IEnumerable<AppointmentDto>> GetConsultantUpcomingAppointmentsAsync(int consultantId)
+    {
+        _logger.LogDebug("Retrieving upcoming appointments for consultant: {ConsultantId}", consultantId);
+
+        var today = DateTime.UtcNow.Date;
+        var appointments = await _unitOfWork.Appointments.GetAllWithIncludesAsync();
+        
+        var upcoming = appointments
+            .Where(a => a.ConsultantId == consultantId && 
+                       a.AppointmentDate >= today &&
+                       a.Status != AppointmentStatus.Cancelled)
+            .OrderBy(a => a.AppointmentDate)
+            .ThenBy(a => a.StartTime)
+            .ToList();
+
+        return _mapper.Map<IEnumerable<AppointmentDto>>(upcoming);
+    }
+
+    /// <summary>
+    /// Get past appointments for a consultant (before today or completed, ordered by date/time DESC)
+    /// </summary>
+    public async Task<IEnumerable<AppointmentDto>> GetConsultantPastAppointmentsAsync(int consultantId)
+    {
+        _logger.LogDebug("Retrieving past appointments for consultant: {ConsultantId}", consultantId);
+
+        var today = DateTime.UtcNow.Date;
+        var appointments = await _unitOfWork.Appointments.GetAllWithIncludesAsync();
+        
+        var past = appointments
+            .Where(a => a.ConsultantId == consultantId && 
+                       (a.AppointmentDate < today || a.Status == AppointmentStatus.Completed))
+            .OrderByDescending(a => a.AppointmentDate)
+            .ThenByDescending(a => a.StartTime)
+            .ToList();
+
+        return _mapper.Map<IEnumerable<AppointmentDto>>(past);
+    }
+
+    /// <summary>
+    /// Get today's appointments for a consultant (ordered by start time ASC)
+    /// </summary>
+    public async Task<IEnumerable<AppointmentDto>> GetConsultantTodayAppointmentsAsync(int consultantId)
+    {
+        _logger.LogDebug("Retrieving today's appointments for consultant: {ConsultantId}", consultantId);
+
+        var today = DateTime.UtcNow.Date;
+        var appointments = await _unitOfWork.Appointments.GetAllWithIncludesAsync();
+        
+        var todayAppointments = appointments
+            .Where(a => a.ConsultantId == consultantId && 
+                       a.AppointmentDate == today &&
+                       a.Status != AppointmentStatus.Cancelled)
+            .OrderBy(a => a.StartTime)
+            .ToList();
+
+        return _mapper.Map<IEnumerable<AppointmentDto>>(todayAppointments);
+    }
+
+    /// <summary>
+    /// Get appointments for a consultant within a date range
+    /// </summary>
+    public async Task<IEnumerable<AppointmentDto>> GetConsultantAppointmentsByDateRangeAsync(int consultantId, DateTime startDate, DateTime endDate)
+    {
+        _logger.LogDebug("Retrieving appointments for consultant: {ConsultantId} from {StartDate} to {EndDate}", 
+            consultantId, startDate, endDate);
+
+        var appointments = await _unitOfWork.Appointments.GetAllWithIncludesAsync();
+        
+        var rangeAppointments = appointments
+            .Where(a => a.ConsultantId == consultantId && 
+                       a.AppointmentDate >= startDate.Date &&
+                       a.AppointmentDate <= endDate.Date)
+            .OrderBy(a => a.AppointmentDate)
+            .ThenBy(a => a.StartTime)
+            .ToList();
+
+        return _mapper.Map<IEnumerable<AppointmentDto>>(rangeAppointments);
+    }
+
+    #endregion
+
+    #region Customer Appointment Views
+
+    /// <summary>
+    /// Get upcoming appointments for a customer (today and future, ordered by date/time ASC)
+    /// </summary>
+    public async Task<IEnumerable<AppointmentDto>> GetCustomerUpcomingAppointmentsAsync(string email)
+    {
+        _logger.LogDebug("Retrieving upcoming appointments for customer: {Email}", email);
+
+        var customers = await _unitOfWork.Customers.FindAsync(c => c.Email == email);
+        var customer = customers.FirstOrDefault();
+        
+        if (customer == null)
+        {
+            return Enumerable.Empty<AppointmentDto>();
+        }
+
+        var today = DateTime.UtcNow.Date;
+        var appointments = await _unitOfWork.Appointments.GetByCustomerIdWithIncludesAsync(customer.Id);
+        
+        var upcoming = appointments
+            .Where(a => a.AppointmentDate >= today &&
+                       a.Status != AppointmentStatus.Cancelled)
+            .OrderBy(a => a.AppointmentDate)
+            .ThenBy(a => a.StartTime)
+            .ToList();
+
+        return _mapper.Map<IEnumerable<AppointmentDto>>(upcoming);
+    }
+
+    /// <summary>
+    /// Get past appointments for a customer (before today or completed, ordered by date/time DESC)
+    /// </summary>
+    public async Task<IEnumerable<AppointmentDto>> GetCustomerPastAppointmentsAsync(string email)
+    {
+        _logger.LogDebug("Retrieving past appointments for customer: {Email}", email);
+
+        var customers = await _unitOfWork.Customers.FindAsync(c => c.Email == email);
+        var customer = customers.FirstOrDefault();
+        
+        if (customer == null)
+        {
+            return Enumerable.Empty<AppointmentDto>();
+        }
+
+        var today = DateTime.UtcNow.Date;
+        var appointments = await _unitOfWork.Appointments.GetByCustomerIdWithIncludesAsync(customer.Id);
+        
+        var past = appointments
+            .Where(a => a.AppointmentDate < today || a.Status == AppointmentStatus.Completed)
+            .OrderByDescending(a => a.AppointmentDate)
+            .ThenByDescending(a => a.StartTime)
+            .ToList();
+
+        return _mapper.Map<IEnumerable<AppointmentDto>>(past);
+    }
+
+    /// <summary>
+    /// Get customer appointments filtered by status
+    /// </summary>
+    public async Task<IEnumerable<AppointmentDto>> GetCustomerAppointmentsByStatusAsync(string email, AppointmentStatus status)
+    {
+        _logger.LogDebug("Retrieving appointments for customer: {Email} with status: {Status}", email, status);
+
+        var customers = await _unitOfWork.Customers.FindAsync(c => c.Email == email);
+        var customer = customers.FirstOrDefault();
+        
+        if (customer == null)
+        {
+            return Enumerable.Empty<AppointmentDto>();
+        }
+
+        var appointments = await _unitOfWork.Appointments.GetByCustomerIdWithIncludesAsync(customer.Id);
+        
+        var filtered = appointments
+            .Where(a => a.Status == status)
+            .OrderByDescending(a => a.AppointmentDate)
+            .ThenByDescending(a => a.StartTime)
+            .ToList();
+
+        return _mapper.Map<IEnumerable<AppointmentDto>>(filtered);
+    }
+
+    /// <summary>
+    /// Get customer appointments within a date range
+    /// </summary>
+    public async Task<IEnumerable<AppointmentDto>> GetCustomerAppointmentsByDateRangeAsync(string email, DateTime startDate, DateTime endDate)
+    {
+        _logger.LogDebug("Retrieving appointments for customer: {Email} from {StartDate} to {EndDate}", 
+            email, startDate, endDate);
+
+        var customers = await _unitOfWork.Customers.FindAsync(c => c.Email == email);
+        var customer = customers.FirstOrDefault();
+        
+        if (customer == null)
+        {
+            return Enumerable.Empty<AppointmentDto>();
+        }
+
+        var appointments = await _unitOfWork.Appointments.GetByCustomerIdWithIncludesAsync(customer.Id);
+        
+        var rangeAppointments = appointments
+            .Where(a => a.AppointmentDate >= startDate.Date &&
+                       a.AppointmentDate <= endDate.Date)
+            .OrderBy(a => a.AppointmentDate)
+            .ThenBy(a => a.StartTime)
+            .ToList();
+
+        return _mapper.Map<IEnumerable<AppointmentDto>>(rangeAppointments);
+    }
+
+    #endregion
+
     /// <summary>
     /// Update an existing appointment
     /// </summary>
@@ -426,15 +665,7 @@ public class AppointmentService : IAppointmentService
 
         _logger.LogInformation("Appointment cancelled successfully: {AppointmentId}", id);
 
-        // Send cancellation notification
-        try
-        {
-            await _notificationService.SendCancellationNotificationAsync(appointment);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to send cancellation notification for appointment: {AppointmentId}", id);
-        }
+        // Note: Notification features are currently disabled
 
         return true;
     }

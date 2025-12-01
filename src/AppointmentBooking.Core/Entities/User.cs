@@ -70,5 +70,6 @@ public class User
 public enum UserRole
 {
     User = 0,
-    Admin = 1
+    Consultant = 1,
+    Admin = 2
 }

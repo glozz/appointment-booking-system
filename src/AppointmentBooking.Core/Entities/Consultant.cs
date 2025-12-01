@@ -17,6 +17,12 @@ public class Consultant
     public int BranchId { get; set; }
     public Branch Branch { get; set; } = null!;
     
+    /// <summary>
+    /// Optional link to a User account for authentication purposes
+    /// </summary>
+    public int? UserId { get; set; }
+    public User? User { get; set; }
+    
     public bool IsActive { get; set; } = true;
     
     public DateTime CreatedAt { get; set; }

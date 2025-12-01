@@ -17,7 +17,6 @@ public class AppointmentServiceTests
 {
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
     private readonly Mock<ILogger<AppointmentService>> _loggerMock;
-    private readonly Mock<INotificationService> _notificationServiceMock;
     private readonly Mock<IAvailabilityService> _availabilityServiceMock;
     private readonly IMapper _mapper;
     private readonly AppointmentService _appointmentService;
@@ -26,7 +25,6 @@ public class AppointmentServiceTests
     {
         _unitOfWorkMock = new Mock<IUnitOfWork>();
         _loggerMock = new Mock<ILogger<AppointmentService>>();
-        _notificationServiceMock = new Mock<INotificationService>();
         _availabilityServiceMock = new Mock<IAvailabilityService>();
 
         var mapperConfig = new MapperConfiguration(cfg =>
@@ -39,7 +37,6 @@ public class AppointmentServiceTests
             _unitOfWorkMock.Object,
             _mapper,
             _loggerMock.Object,
-            _notificationServiceMock.Object,
             _availabilityServiceMock.Object);
     }
 
@@ -325,7 +322,13 @@ public class AppointmentServiceTests
             }});
         _unitOfWorkMock.Setup(u => u.BranchOperatingHours).Returns(branchHoursRepoMock.Object);
 
-        // No double booking
+        // Mock customer repository - new customer, no conflicts
+        var customerRepoMock = new Mock<IRepository<Customer>>();
+        customerRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<Customer, bool>>>()))
+            .ReturnsAsync(Enumerable.Empty<Customer>()); // New customer
+        _unitOfWorkMock.Setup(u => u.Customers).Returns(customerRepoMock.Object);
+
+        // No double booking, consultant overlap check
         var appointmentRepoMock = new Mock<IAppointmentRepository>();
         var appointmentCallCount = 0;
         appointmentRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<Appointment, bool>>>()))
@@ -553,6 +556,291 @@ public class AppointmentServiceTests
 
         // Assert
         Assert.Equal(expectedOverlap, hasOverlap);
+    }
+
+    #endregion
+
+    #region Customer Cross-Branch Conflict Detection Tests
+
+    [Fact]
+    public async Task CreateAppointmentAsync_CustomerHasOverlappingAppointmentAtAnotherBranch_ThrowsConflictException()
+    {
+        // Arrange
+        var appointmentDate = DateTime.Today.AddDays(1);
+        var dto = new CreateAppointmentDto
+        {
+            BranchId = 2, // Requesting at branch 2
+            ServiceId = 1,
+            AppointmentDate = appointmentDate,
+            StartTime = new TimeSpan(10, 0, 0), // 10:00
+            Customer = new CustomerDto
+            {
+                FirstName = "John",
+                LastName = "Doe",
+                Email = "john@example.com",
+                Phone = "0123456789"
+            }
+        };
+
+        var service = new Service { Id = 1, DurationMinutes = 30 };
+        var serviceRepoMock = new Mock<IRepository<Service>>();
+        serviceRepoMock.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(service);
+        _unitOfWorkMock.Setup(u => u.Services).Returns(serviceRepoMock.Object);
+
+        var branchHoursRepoMock = new Mock<IRepository<BranchOperatingHours>>();
+        branchHoursRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<BranchOperatingHours, bool>>>()))
+            .ReturnsAsync(new[] { new BranchOperatingHours 
+            { 
+                BranchId = 2, 
+                DayOfWeek = appointmentDate.DayOfWeek,
+                OpenTime = new TimeSpan(8, 0, 0),
+                CloseTime = new TimeSpan(17, 0, 0),
+                IsClosed = false
+            }});
+        _unitOfWorkMock.Setup(u => u.BranchOperatingHours).Returns(branchHoursRepoMock.Object);
+
+        // Existing customer with existing appointment at branch 1
+        var customer = new Customer { Id = 1, Email = "john@example.com", FirstName = "John", LastName = "Doe", Phone = "0123456789" };
+        var customerRepoMock = new Mock<IRepository<Customer>>();
+        customerRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<Customer, bool>>>()))
+            .ReturnsAsync(new[] { customer });
+        _unitOfWorkMock.Setup(u => u.Customers).Returns(customerRepoMock.Object);
+
+        // Existing branch for error message
+        var existingBranch = new Branch { Id = 1, Name = "Downtown Branch", City = "Test City" };
+        var branchRepoMock = new Mock<IRepository<Branch>>();
+        branchRepoMock.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(existingBranch);
+        _unitOfWorkMock.Setup(u => u.Branches).Returns(branchRepoMock.Object);
+
+        var appointmentRepoMock = new Mock<IAppointmentRepository>();
+        var findAsyncCallCount = 0;
+        appointmentRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<Appointment, bool>>>()))
+            .ReturnsAsync(() =>
+            {
+                findAsyncCallCount++;
+                // First call is for double-booking check at branch 2 (return empty)
+                if (findAsyncCallCount == 1)
+                    return Enumerable.Empty<Appointment>();
+                // Second call is for customer availability check - return overlapping appointment at branch 1
+                else
+                    return new[] { new Appointment 
+                    { 
+                        Id = 1, 
+                        CustomerId = 1, 
+                        BranchId = 1, // Different branch
+                        AppointmentDate = appointmentDate,
+                        StartTime = new TimeSpan(9, 45, 0), // 9:45-10:15 overlaps with 10:00-10:30
+                        EndTime = new TimeSpan(10, 15, 0),
+                        Status = AppointmentStatus.Confirmed
+                    }};
+            });
+        _unitOfWorkMock.Setup(u => u.Appointments).Returns(appointmentRepoMock.Object);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<ConflictException>(() => 
+            _appointmentService.CreateAppointmentAsync(dto));
+        Assert.Contains("You already have an appointment at", exception.Message);
+        Assert.Contains("Downtown Branch", exception.Message);
+    }
+
+    [Fact]
+    public async Task CreateAppointmentAsync_NewCustomer_NoConflictCheck()
+    {
+        // Arrange - For a new customer, no conflicts are possible
+        var dto = new CreateAppointmentDto
+        {
+            BranchId = 1,
+            ServiceId = 1,
+            AppointmentDate = DateTime.Today.AddDays(1),
+            StartTime = new TimeSpan(10, 0, 0),
+            Customer = new CustomerDto
+            {
+                FirstName = "New",
+                LastName = "Customer",
+                Email = "newcustomer@example.com",
+                Phone = "0123456789"
+            }
+        };
+
+        var service = new Service { Id = 1, DurationMinutes = 30 };
+        var serviceRepoMock = new Mock<IRepository<Service>>();
+        serviceRepoMock.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(service);
+        _unitOfWorkMock.Setup(u => u.Services).Returns(serviceRepoMock.Object);
+
+        var branchHoursRepoMock = new Mock<IRepository<BranchOperatingHours>>();
+        branchHoursRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<BranchOperatingHours, bool>>>()))
+            .ReturnsAsync(new[] { new BranchOperatingHours 
+            { 
+                BranchId = 1, 
+                DayOfWeek = dto.AppointmentDate.DayOfWeek,
+                OpenTime = new TimeSpan(8, 0, 0),
+                CloseTime = new TimeSpan(17, 0, 0),
+                IsClosed = false
+            }});
+        _unitOfWorkMock.Setup(u => u.BranchOperatingHours).Returns(branchHoursRepoMock.Object);
+
+        // New customer - not found in database
+        var customerRepoMock = new Mock<IRepository<Customer>>();
+        customerRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<Customer, bool>>>()))
+            .ReturnsAsync(Enumerable.Empty<Customer>());
+        _unitOfWorkMock.Setup(u => u.Customers).Returns(customerRepoMock.Object);
+
+        // No double booking
+        var appointmentRepoMock = new Mock<IAppointmentRepository>();
+        appointmentRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<Appointment, bool>>>()))
+            .ReturnsAsync(Enumerable.Empty<Appointment>());
+        _unitOfWorkMock.Setup(u => u.Appointments).Returns(appointmentRepoMock.Object);
+
+        _availabilityServiceMock.Setup(a => a.IsSlotAvailableAsync(It.IsAny<int>(), It.IsAny<DateTime>(), It.IsAny<TimeSpan>(), It.IsAny<TimeSpan>()))
+            .ReturnsAsync(true);
+
+        var consultant = new Consultant { Id = 1, BranchId = 1, IsActive = true, FirstName = "Test", LastName = "Consultant" };
+        var consultantRepoMock = new Mock<IRepository<Consultant>>();
+        consultantRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<Consultant, bool>>>()))
+            .ReturnsAsync(new[] { consultant });
+        _unitOfWorkMock.Setup(u => u.Consultants).Returns(consultantRepoMock.Object);
+
+        var branch = new Branch { Id = 1, Name = "Test Branch", City = "Test City" };
+        var branchRepoMock = new Mock<IRepository<Branch>>();
+        branchRepoMock.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(branch);
+        _unitOfWorkMock.Setup(u => u.Branches).Returns(branchRepoMock.Object);
+
+        Appointment? createdAppointment = null;
+        appointmentRepoMock.Setup(r => r.AddAsync(It.IsAny<Appointment>()))
+            .Callback<Appointment>(a => { 
+                a.Id = 1;
+                a.Branch = branch;
+                a.Service = service;
+                a.Customer = new Customer { Id = 1, Email = dto.Customer.Email, FirstName = dto.Customer.FirstName, LastName = dto.Customer.LastName };
+                a.Consultant = consultant;
+                createdAppointment = a; 
+            })
+            .ReturnsAsync((Appointment a) => a);
+
+        customerRepoMock.Setup(r => r.AddAsync(It.IsAny<Customer>()))
+            .ReturnsAsync((Customer c) => { c.Id = 1; return c; });
+
+        appointmentRepoMock.Setup(r => r.GetByConfirmationCodeWithIncludesAsync(It.IsAny<string>()))
+            .ReturnsAsync(() => createdAppointment);
+        appointmentRepoMock.Setup(r => r.ConfirmationCodeExistsAsync(It.IsAny<string>()))
+            .ReturnsAsync(false);
+
+        _unitOfWorkMock.Setup(u => u.SaveChangesAsync()).ReturnsAsync(1);
+        _unitOfWorkMock.Setup(u => u.BeginTransactionAsync()).Returns(Task.CompletedTask);
+        _unitOfWorkMock.Setup(u => u.CommitTransactionAsync()).Returns(Task.CompletedTask);
+        _unitOfWorkMock.Setup(u => u.RollbackTransactionAsync()).Returns(Task.CompletedTask);
+
+        // Act - Should not throw for new customer
+        var result = await _appointmentService.CreateAppointmentAsync(dto);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.NotNull(createdAppointment);
+    }
+
+    [Fact]
+    public async Task CreateAppointmentAsync_CustomerWithNonOverlappingAppointment_Succeeds()
+    {
+        // Arrange - Customer has an appointment but it doesn't overlap
+        var appointmentDate = DateTime.Today.AddDays(1);
+        var dto = new CreateAppointmentDto
+        {
+            BranchId = 2,
+            ServiceId = 1,
+            AppointmentDate = appointmentDate,
+            StartTime = new TimeSpan(14, 0, 0), // 14:00-14:30
+            Customer = new CustomerDto
+            {
+                FirstName = "John",
+                LastName = "Doe",
+                Email = "john@example.com",
+                Phone = "0123456789"
+            }
+        };
+
+        var service = new Service { Id = 1, DurationMinutes = 30 };
+        var serviceRepoMock = new Mock<IRepository<Service>>();
+        serviceRepoMock.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(service);
+        _unitOfWorkMock.Setup(u => u.Services).Returns(serviceRepoMock.Object);
+
+        var branchHoursRepoMock = new Mock<IRepository<BranchOperatingHours>>();
+        branchHoursRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<BranchOperatingHours, bool>>>()))
+            .ReturnsAsync(new[] { new BranchOperatingHours 
+            { 
+                BranchId = 2, 
+                DayOfWeek = appointmentDate.DayOfWeek,
+                OpenTime = new TimeSpan(8, 0, 0),
+                CloseTime = new TimeSpan(17, 0, 0),
+                IsClosed = false
+            }});
+        _unitOfWorkMock.Setup(u => u.BranchOperatingHours).Returns(branchHoursRepoMock.Object);
+
+        // Existing customer
+        var customer = new Customer { Id = 1, Email = "john@example.com", FirstName = "John", LastName = "Doe", Phone = "0123456789" };
+        var customerRepoMock = new Mock<IRepository<Customer>>();
+        customerRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<Customer, bool>>>()))
+            .ReturnsAsync(new[] { customer });
+        _unitOfWorkMock.Setup(u => u.Customers).Returns(customerRepoMock.Object);
+
+        var appointmentRepoMock = new Mock<IAppointmentRepository>();
+        var findAsyncCallCount = 0;
+        appointmentRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<Appointment, bool>>>()))
+            .ReturnsAsync(() =>
+            {
+                findAsyncCallCount++;
+                // First call: double-booking check
+                if (findAsyncCallCount == 1)
+                    return Enumerable.Empty<Appointment>();
+                // Second call: customer availability check - existing appointment at 10:00-10:30 doesn't overlap with 14:00-14:30
+                if (findAsyncCallCount == 2)
+                    return Enumerable.Empty<Appointment>(); // The overlap filter will exclude non-overlapping appointments
+                // Third+ calls: consultant overlap check
+                return Enumerable.Empty<Appointment>();
+            });
+        _unitOfWorkMock.Setup(u => u.Appointments).Returns(appointmentRepoMock.Object);
+
+        _availabilityServiceMock.Setup(a => a.IsSlotAvailableAsync(It.IsAny<int>(), It.IsAny<DateTime>(), It.IsAny<TimeSpan>(), It.IsAny<TimeSpan>()))
+            .ReturnsAsync(true);
+
+        var consultant = new Consultant { Id = 1, BranchId = 2, IsActive = true, FirstName = "Test", LastName = "Consultant" };
+        var consultantRepoMock = new Mock<IRepository<Consultant>>();
+        consultantRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<Consultant, bool>>>()))
+            .ReturnsAsync(new[] { consultant });
+        _unitOfWorkMock.Setup(u => u.Consultants).Returns(consultantRepoMock.Object);
+
+        var branch = new Branch { Id = 2, Name = "Branch 2", City = "Test City" };
+        var branchRepoMock = new Mock<IRepository<Branch>>();
+        branchRepoMock.Setup(r => r.GetByIdAsync(It.IsAny<int>())).ReturnsAsync(branch);
+        _unitOfWorkMock.Setup(u => u.Branches).Returns(branchRepoMock.Object);
+
+        Appointment? createdAppointment = null;
+        appointmentRepoMock.Setup(r => r.AddAsync(It.IsAny<Appointment>()))
+            .Callback<Appointment>(a => { 
+                a.Id = 1;
+                a.Branch = branch;
+                a.Service = service;
+                a.Customer = customer;
+                a.Consultant = consultant;
+                createdAppointment = a; 
+            })
+            .ReturnsAsync((Appointment a) => a);
+
+        appointmentRepoMock.Setup(r => r.GetByConfirmationCodeWithIncludesAsync(It.IsAny<string>()))
+            .ReturnsAsync(() => createdAppointment);
+        appointmentRepoMock.Setup(r => r.ConfirmationCodeExistsAsync(It.IsAny<string>()))
+            .ReturnsAsync(false);
+
+        _unitOfWorkMock.Setup(u => u.SaveChangesAsync()).ReturnsAsync(1);
+        _unitOfWorkMock.Setup(u => u.BeginTransactionAsync()).Returns(Task.CompletedTask);
+        _unitOfWorkMock.Setup(u => u.CommitTransactionAsync()).Returns(Task.CompletedTask);
+        _unitOfWorkMock.Setup(u => u.RollbackTransactionAsync()).Returns(Task.CompletedTask);
+
+        // Act - Should not throw as the appointments don't overlap
+        var result = await _appointmentService.CreateAppointmentAsync(dto);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.NotNull(createdAppointment);
     }
 
     #endregion

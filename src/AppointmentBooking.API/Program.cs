@@ -108,6 +108,7 @@ builder.Services.AddScoped<IUserNotificationService, UserNotificationService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IAppointmentTypeService, AppointmentTypeService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<IConsultantService, ConsultantService>();
 
 // CORS
 builder.Services.AddCors(options =>

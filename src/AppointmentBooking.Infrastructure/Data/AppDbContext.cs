@@ -112,5 +112,16 @@ public class AppDbContext : DbContext
             .WithMany(b => b.Consultants)
             .HasForeignKey(c => c.BranchId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Consultant>()
+            .HasOne(c => c.User)
+            .WithMany()
+            .HasForeignKey(c => c.UserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<Consultant>()
+            .HasIndex(c => c.UserId)
+            .IsUnique()
+            .HasFilter("[UserId] IS NOT NULL");
     }
 }
