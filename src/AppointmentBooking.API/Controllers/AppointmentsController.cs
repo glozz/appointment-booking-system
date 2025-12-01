@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using AppointmentBooking.Application.DTOs;
 using AppointmentBooking.Application.Interfaces;
+using AppointmentBooking.Core.Enums;
 using AppointmentBooking.Core.Exceptions;
 
 namespace AppointmentBooking.API.Controllers;
@@ -34,6 +36,10 @@ public class AppointmentsController : ControllerBase
         {
             return Conflict(new { message = ex.Message });
         }
+        catch (ValidationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [HttpGet("{id}")]
@@ -51,6 +57,7 @@ public class AppointmentsController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<IEnumerable<AppointmentDto>>> GetAllAppointments()
     {
         var appointments = await _appointmentService.GetAllAppointmentsAsync();
@@ -70,6 +77,87 @@ public class AppointmentsController : ControllerBase
         var appointments = await _appointmentService.GetAppointmentsByBranchAsync(branchId);
         return Ok(appointments);
     }
+
+    #region Customer Appointment Endpoints
+
+    /// <summary>
+    /// Get upcoming appointments for the current customer
+    /// </summary>
+    [HttpGet("my/upcoming")]
+    [Authorize]
+    public async Task<ActionResult<IEnumerable<AppointmentDto>>> GetMyUpcomingAppointments()
+    {
+        var email = GetCurrentUserEmail();
+        if (string.IsNullOrEmpty(email))
+        {
+            return Unauthorized();
+        }
+
+        var appointments = await _appointmentService.GetCustomerUpcomingAppointmentsAsync(email);
+        return Ok(appointments);
+    }
+
+    /// <summary>
+    /// Get past appointments for the current customer
+    /// </summary>
+    [HttpGet("my/past")]
+    [Authorize]
+    public async Task<ActionResult<IEnumerable<AppointmentDto>>> GetMyPastAppointments()
+    {
+        var email = GetCurrentUserEmail();
+        if (string.IsNullOrEmpty(email))
+        {
+            return Unauthorized();
+        }
+
+        var appointments = await _appointmentService.GetCustomerPastAppointmentsAsync(email);
+        return Ok(appointments);
+    }
+
+    /// <summary>
+    /// Get appointments for the current customer by status
+    /// </summary>
+    [HttpGet("my/status/{status}")]
+    [Authorize]
+    public async Task<ActionResult<IEnumerable<AppointmentDto>>> GetMyAppointmentsByStatus(AppointmentStatus status)
+    {
+        var email = GetCurrentUserEmail();
+        if (string.IsNullOrEmpty(email))
+        {
+            return Unauthorized();
+        }
+
+        var appointments = await _appointmentService.GetCustomerAppointmentsByStatusAsync(email, status);
+        return Ok(appointments);
+    }
+
+    /// <summary>
+    /// Get appointments for the current customer within a date range
+    /// </summary>
+    [HttpGet("my")]
+    [Authorize]
+    public async Task<ActionResult<IEnumerable<AppointmentDto>>> GetMyAppointments(
+        [FromQuery] DateTime? startDate,
+        [FromQuery] DateTime? endDate)
+    {
+        var email = GetCurrentUserEmail();
+        if (string.IsNullOrEmpty(email))
+        {
+            return Unauthorized();
+        }
+
+        if (startDate.HasValue && endDate.HasValue)
+        {
+            var appointments = await _appointmentService.GetCustomerAppointmentsByDateRangeAsync(email, startDate.Value, endDate.Value);
+            return Ok(appointments);
+        }
+
+        // If no date range specified, return all appointments
+        var allAppointments = await _appointmentService.GetAppointmentsByCustomerEmailAsync(email);
+        return Ok(allAppointments);
+    }
+
+    #endregion
 
     [HttpPut("{id}")]
     public async Task<ActionResult<AppointmentDto>> UpdateAppointment(int id, [FromBody] UpdateAppointmentDto dto)
@@ -100,6 +188,15 @@ public class AppointmentsController : ControllerBase
         {
             return NotFound(new { message = ex.Message });
         }
+    }
+
+    /// <summary>
+    /// Get the current user's email from claims
+    /// </summary>
+    private string? GetCurrentUserEmail()
+    {
+        return User.FindFirst("email")?.Value ?? 
+               User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
     }
 }
 

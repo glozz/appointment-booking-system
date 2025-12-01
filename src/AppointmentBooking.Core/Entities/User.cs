@@ -67,8 +67,14 @@ public class User
     public ICollection<Notification> Notifications { get; set; } = new List<Notification>();
 }
 
+/// <summary>
+/// User roles for authorization purposes.
+/// Note: The Consultant role (value 1) was added, shifting Admin from 1 to 2.
+/// A database migration may be needed to update existing Admin user records.
+/// </summary>
 public enum UserRole
 {
     User = 0,
-    Admin = 1
+    Consultant = 1,
+    Admin = 2
 }
