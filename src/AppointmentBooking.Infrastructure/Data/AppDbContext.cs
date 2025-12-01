@@ -20,6 +20,7 @@ public class AppDbContext : DbContext
     public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<AppointmentType> AppointmentTypes => Set<AppointmentType>();
+    public DbSet<Consultant> Consultants => Set<Consultant>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -98,5 +99,18 @@ public class AppDbContext : DbContext
             .WithMany(u => u.Notifications)
             .HasForeignKey(n => n.UserId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // Appointment unique index on (BranchId, AppointmentDate, StartTime) for double-booking prevention
+        modelBuilder.Entity<Appointment>()
+            .HasIndex(a => new { a.BranchId, a.AppointmentDate, a.StartTime })
+            .IsUnique()
+            .HasDatabaseName("IX_Appointments_BranchId_AppointmentDate_StartTime");
+
+        // Consultant configuration
+        modelBuilder.Entity<Consultant>()
+            .HasOne(c => c.Branch)
+            .WithMany(b => b.Consultants)
+            .HasForeignKey(c => c.BranchId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

@@ -38,6 +38,13 @@
                             <th>Service:</th>
                             <td>@Model.Service?.Name</td>
                         </tr>
+                        @if (Model.Consultant != null)
+                        {
+                            <tr>
+                                <th>Consultant:</th>
+                                <td>@Model.Consultant.FullName</td>
+                            </tr>
+                        }
                         <tr>
                             <th>Status:</th>
                             <td>

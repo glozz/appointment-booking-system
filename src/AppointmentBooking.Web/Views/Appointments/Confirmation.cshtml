@@ -26,9 +26,9 @@
                         <tr>
                             <th>Time:</th>
                             <td>
-                                @(Model.StartTime != null ? Model.StartTime.ToString(@"hh\:mm") : "--:--")
+                                @Model.StartTime.ToString(@"hh\:mm")
                                 -
-                                @(Model.EndTime != null ? Model.EndTime.ToString(@"hh\:mm") : "--:--")
+                                @Model.EndTime.ToString(@"hh\:mm")
                             </td>
                         </tr>
                         <tr>
@@ -39,6 +39,13 @@
                             <th>Service:</th>
                             <td>@Model.Service?.Name</td>
                         </tr>
+                        @if (Model.Consultant != null)
+                        {
+                            <tr>
+                                <th>Consultant:</th>
+                                <td>@Model.Consultant.FullName</td>
+                            </tr>
+                        }
                     </table>
 
                     <div class="d-grid mt-4">
