@@ -1,0 +1,195 @@
+@model AppointmentDto
+@{
+    ViewData["Title"] = "Appointment Details";
+}
+
+<div class="container my-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1><i class="bi bi-calendar-event text-primary"></i> Appointment Details</h1>
+                <a asp-action="Dashboard" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Back to Dashboard
+                </a>
+            </div>
+            
+            @if (TempData["SuccessMessage"] != null)
+            {
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="bi bi-check-circle"></i> @TempData["SuccessMessage"]
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            }
+            
+            <div class="card">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-calendar-event"></i> Appointment Information</span>
+                    @{
+                        var headerBadgeClass = Model.Status switch
+                        {
+                            AppointmentBooking.Core.Enums.AppointmentStatus.Confirmed => "bg-success",
+                            AppointmentBooking.Core.Enums.AppointmentStatus.Pending => "bg-warning text-dark",
+                            AppointmentBooking.Core.Enums.AppointmentStatus.Cancelled => "bg-danger",
+                            AppointmentBooking.Core.Enums.AppointmentStatus.Completed => "bg-secondary",
+                            AppointmentBooking.Core.Enums.AppointmentStatus.NoShow => "bg-warning text-dark",
+                            _ => "bg-info"
+                        };
+                    }
+                    <span class="badge @headerBadgeClass fs-6">@Model.Status</span>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <strong><i class="bi bi-hash"></i> Confirmation Code:</strong> 
+                        <code class="fs-5">@Model.ConfirmationCode</code>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5 class="border-bottom pb-2"><i class="bi bi-calendar3 text-primary"></i> Date & Time</h5>
+                            <table class="table table-sm table-borderless">
+                                <tr>
+                                    <td class="fw-bold" width="40%">Date:</td>
+                                    <td>@Model.AppointmentDate.ToString("dddd, MMMM dd, yyyy")</td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-bold">Time:</td>
+                                    <td>@Model.StartTime.ToString(@"hh\:mm") - @Model.EndTime.ToString(@"hh\:mm")</td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-bold">Booked On:</td>
+                                    <td>@Model.CreatedAt.ToString("MMM dd, yyyy 'at' HH:mm")</td>
+                                </tr>
+                            </table>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <h5 class="border-bottom pb-2"><i class="bi bi-building text-primary"></i> Location</h5>
+                            <table class="table table-sm table-borderless">
+                                <tr>
+                                    <td class="fw-bold" width="40%">Branch:</td>
+                                    <td>@Model.Branch?.Name</td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-bold">City:</td>
+                                    <td>@Model.Branch?.City</td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-bold">Address:</td>
+                                    <td>@Model.Branch?.Address</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <hr class="my-4" />
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5 class="border-bottom pb-2"><i class="bi bi-list-check text-success"></i> Service</h5>
+                            <table class="table table-sm table-borderless">
+                                <tr>
+                                    <td class="fw-bold" width="40%">Service:</td>
+                                    <td>@Model.Service?.Name</td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-bold">Duration:</td>
+                                    <td>@Model.Service?.DurationMinutes minutes</td>
+                                </tr>
+                                @if (!string.IsNullOrEmpty(Model.Service?.Description))
+                                {
+                                    <tr>
+                                        <td class="fw-bold">Description:</td>
+                                        <td>@Model.Service.Description</td>
+                                    </tr>
+                                }
+                            </table>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <h5 class="border-bottom pb-2"><i class="bi bi-person text-info"></i> Consultant</h5>
+                            @if (Model.Consultant != null)
+                            {
+                                <table class="table table-sm table-borderless">
+                                    <tr>
+                                        <td class="fw-bold" width="40%">Name:</td>
+                                        <td>@Model.Consultant.FullName</td>
+                                    </tr>
+                                </table>
+                            }
+                            else
+                            {
+                                <p class="text-muted">Consultant will be assigned at check-in.</p>
+                            }
+                        </div>
+                    </div>
+                    
+                    @if (!string.IsNullOrEmpty(Model.Notes))
+                    {
+                        <hr class="my-4" />
+                        <h5 class="border-bottom pb-2"><i class="bi bi-chat-left-text text-secondary"></i> Notes</h5>
+                        <p class="bg-light p-3 rounded">@Model.Notes</p>
+                    }
+                    
+                    @if (Model.Status == AppointmentBooking.Core.Enums.AppointmentStatus.Cancelled && 
+                         !string.IsNullOrEmpty(Model.CancellationReason))
+                    {
+                        <hr class="my-4" />
+                        <div class="alert alert-danger">
+                            <h5><i class="bi bi-x-circle"></i> Cancellation Reason</h5>
+                            <p class="mb-0">@Model.CancellationReason</p>
+                        </div>
+                    }
+                </div>
+                
+                <div class="card-footer bg-transparent">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <a asp-action="Dashboard" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left"></i> Back to My Appointments
+                        </a>
+                        
+                        @if (Model.Status == AppointmentBooking.Core.Enums.AppointmentStatus.Confirmed ||
+                             Model.Status == AppointmentBooking.Core.Enums.AppointmentStatus.Pending)
+                        {
+                            <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#cancelModal">
+                                <i class="bi bi-x-circle"></i> Cancel Appointment
+                            </button>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (Model.Status == AppointmentBooking.Core.Enums.AppointmentStatus.Confirmed ||
+     Model.Status == AppointmentBooking.Core.Enums.AppointmentStatus.Pending)
+{
+    <!-- Cancel Modal -->
+    <div class="modal fade" id="cancelModal" tabindex="-1" aria-labelledby="cancelModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form asp-action="Cancel" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="id" value="@Model.Id" />
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="cancelModalLabel">Cancel Appointment</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Are you sure you want to cancel your appointment on <strong>@Model.AppointmentDate.ToString("MMMM dd, yyyy")</strong> at <strong>@Model.StartTime.ToString(@"hh\:mm")</strong>?</p>
+                        <div class="mb-3">
+                            <label for="reason" class="form-label">Cancellation Reason</label>
+                            <textarea name="reason" id="reason" class="form-control" rows="3" required placeholder="Please provide a reason for cancellation"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-x-circle"></i> Cancel Appointment
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+}
