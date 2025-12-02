@@ -1,0 +1,238 @@
+@model CustomerDashboardViewModel
+@{
+    ViewData["Title"] = "My Appointments";
+}
+
+<div class="container my-5">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="mb-4"><i class="bi bi-calendar-check text-primary"></i> My Appointments</h1>
+            
+            @if (TempData["SuccessMessage"] != null)
+            {
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="bi bi-check-circle"></i> @TempData["SuccessMessage"]
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            }
+            
+            <!-- Summary Cards -->
+            <div class="row mb-4">
+                <div class="col-md-4 mb-3">
+                    <div class="card text-center h-100">
+                        <div class="card-body">
+                            <i class="bi bi-calendar-check display-4 text-primary"></i>
+                            <h3 class="mt-2">@Model.TotalAppointments</h3>
+                            <p class="text-muted">Total Appointments</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <div class="card text-center h-100">
+                        <div class="card-body">
+                            <i class="bi bi-calendar-plus display-4 text-success"></i>
+                            <h3 class="mt-2">@Model.UpcomingCount</h3>
+                            <p class="text-muted">Upcoming</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <div class="card text-center h-100">
+                        <div class="card-body">
+                            <i class="bi bi-check-circle display-4 text-secondary"></i>
+                            <h3 class="mt-2">@Model.CompletedCount</h3>
+                            <p class="text-muted">Completed</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Tab Navigation -->
+            <ul class="nav nav-tabs mb-4" id="appointmentTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="upcoming-tab" data-bs-toggle="tab" data-bs-target="#upcoming" type="button" role="tab" aria-controls="upcoming" aria-selected="true">
+                        <i class="bi bi-calendar-plus"></i> Upcoming (@Model.UpcomingAppointments.Count())
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="past-tab" data-bs-toggle="tab" data-bs-target="#past" type="button" role="tab" aria-controls="past" aria-selected="false">
+                        <i class="bi bi-calendar-check"></i> Past (@Model.PastAppointments.Count())
+                    </button>
+                </li>
+            </ul>
+            
+            <!-- Tab Content -->
+            <div class="tab-content" id="appointmentTabsContent">
+                <!-- Upcoming Tab -->
+                <div class="tab-pane fade show active" id="upcoming" role="tabpanel" aria-labelledby="upcoming-tab">
+                    @if (Model.UpcomingAppointments.Any())
+                    {
+                        <div class="row">
+                            @foreach (var appointment in Model.UpcomingAppointments)
+                            {
+                                <div class="col-md-6 col-lg-4 mb-4">
+                                    <div class="card h-100">
+                                        <div class="card-header d-flex justify-content-between align-items-center">
+                                            <span class="fw-bold">@appointment.AppointmentDate.ToString("MMM dd, yyyy")</span>
+                                            @{
+                                                var badgeClass = appointment.Status switch
+                                                {
+                                                    AppointmentBooking.Core.Enums.AppointmentStatus.Confirmed => "bg-success",
+                                                    AppointmentBooking.Core.Enums.AppointmentStatus.Pending => "bg-warning text-dark",
+                                                    AppointmentBooking.Core.Enums.AppointmentStatus.Cancelled => "bg-danger",
+                                                    AppointmentBooking.Core.Enums.AppointmentStatus.Completed => "bg-secondary",
+                                                    _ => "bg-info"
+                                                };
+                                            }
+                                            <span class="badge @badgeClass">@appointment.Status</span>
+                                        </div>
+                                        <div class="card-body">
+                                            <p class="mb-2">
+                                                <i class="bi bi-clock text-primary"></i>
+                                                <strong>@appointment.StartTime.ToString(@"hh\:mm") - @appointment.EndTime.ToString(@"hh\:mm")</strong>
+                                            </p>
+                                            <p class="mb-2">
+                                                <i class="bi bi-building text-primary"></i>
+                                                @appointment.Branch?.Name, @appointment.Branch?.City
+                                            </p>
+                                            <p class="mb-2">
+                                                <i class="bi bi-list-check text-success"></i>
+                                                @appointment.Service?.Name (@appointment.Service?.DurationMinutes min)
+                                            </p>
+                                            @if (appointment.Consultant != null)
+                                            {
+                                                <p class="mb-2">
+                                                    <i class="bi bi-person text-info"></i>
+                                                    @appointment.Consultant.FullName
+                                                </p>
+                                            }
+                                            <p class="mb-0 text-muted small">
+                                                <i class="bi bi-hash"></i> @appointment.ConfirmationCode
+                                            </p>
+                                        </div>
+                                        <div class="card-footer bg-transparent">
+                                            <a asp-action="Details" asp-route-id="@appointment.Id" class="btn btn-outline-primary btn-sm">
+                                                <i class="bi bi-eye"></i> View Details
+                                            </a>
+                                            @if (appointment.Status == AppointmentBooking.Core.Enums.AppointmentStatus.Confirmed || 
+                                                 appointment.Status == AppointmentBooking.Core.Enums.AppointmentStatus.Pending)
+                                            {
+                                                <button type="button" class="btn btn-outline-danger btn-sm" 
+                                                        data-bs-toggle="modal" 
+                                                        data-bs-target="#cancelModal-@appointment.Id">
+                                                    <i class="bi bi-x-circle"></i> Cancel
+                                                </button>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Cancel Modal for each appointment -->
+                                <div class="modal fade" id="cancelModal-@appointment.Id" tabindex="-1" aria-labelledby="cancelModalLabel-@appointment.Id" aria-hidden="true">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <form asp-action="Cancel" method="post">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="id" value="@appointment.Id" />
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title" id="cancelModalLabel-@appointment.Id">Cancel Appointment</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <p>Are you sure you want to cancel your appointment on <strong>@appointment.AppointmentDate.ToString("MMMM dd, yyyy")</strong> at <strong>@appointment.StartTime.ToString(@"hh\:mm")</strong>?</p>
+                                                    <div class="mb-3">
+                                                        <label for="reason-@appointment.Id" class="form-label">Cancellation Reason</label>
+                                                        <textarea name="reason" id="reason-@appointment.Id" class="form-control" rows="3" required placeholder="Please provide a reason for cancellation"></textarea>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                                    <button type="submit" class="btn btn-danger">
+                                                        <i class="bi bi-x-circle"></i> Cancel Appointment
+                                                    </button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center py-5">
+                            <i class="bi bi-calendar-x display-1 text-muted"></i>
+                            <h4 class="mt-3">No Upcoming Appointments</h4>
+                            <p class="text-muted">You don't have any scheduled appointments.</p>
+                            <a asp-controller="Appointments" asp-action="Book" class="btn btn-primary">
+                                <i class="bi bi-calendar-plus"></i> Book an Appointment
+                            </a>
+                        </div>
+                    }
+                </div>
+                
+                <!-- Past Tab -->
+                <div class="tab-pane fade" id="past" role="tabpanel" aria-labelledby="past-tab">
+                    @if (Model.PastAppointments.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Time</th>
+                                        <th>Branch</th>
+                                        <th>Service</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var appointment in Model.PastAppointments)
+                                    {
+                                        <tr>
+                                            <td>@appointment.AppointmentDate.ToString("MMM dd, yyyy")</td>
+                                            <td>@appointment.StartTime.ToString(@"hh\:mm")</td>
+                                            <td>@appointment.Branch?.Name</td>
+                                            <td>@appointment.Service?.Name</td>
+                                            <td>
+                                                @{
+                                                    var pastBadgeClass = appointment.Status switch
+                                                    {
+                                                        AppointmentBooking.Core.Enums.AppointmentStatus.Completed => "bg-secondary",
+                                                        AppointmentBooking.Core.Enums.AppointmentStatus.Cancelled => "bg-danger",
+                                                        AppointmentBooking.Core.Enums.AppointmentStatus.NoShow => "bg-warning text-dark",
+                                                        _ => "bg-info"
+                                                    };
+                                                }
+                                                <span class="badge @pastBadgeClass">@appointment.Status</span>
+                                            </td>
+                                            <td>
+                                                <a asp-action="Details" asp-route-id="@appointment.Id" class="btn btn-outline-primary btn-sm">
+                                                    <i class="bi bi-eye"></i> View
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="text-center">
+                            <a asp-action="Past" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-right"></i> View All Past Appointments
+                            </a>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center py-5">
+                            <i class="bi bi-calendar-check display-1 text-muted"></i>
+                            <h4 class="mt-3">No Past Appointments</h4>
+                            <p class="text-muted">You don't have any past appointments.</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

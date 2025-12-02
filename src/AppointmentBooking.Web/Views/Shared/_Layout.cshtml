@@ -10,6 +10,7 @@
         body { background-color: #f8f9fa; }
         .hero { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 60px 0; }
         .card { border: none; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
+        .nav-link.active { font-weight: bold; border-bottom: 2px solid #fff; }
     </style>
 </head>
 <body>
@@ -28,11 +29,45 @@
                     </li>
                     @if (User.Identity?.IsAuthenticated == true)
                     {
+                        @if (User.IsInRole("Consultant") || User.IsInRole("Admin"))
+                        {
+                            <!-- Consultant Menu -->
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="ConsultantPortal" asp-action="Dashboard">
+                                    <i class="bi bi-calendar2-week"></i> My Schedule
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="ConsultantPortal" asp-action="TodaySchedule">
+                                    <i class="bi bi-calendar-day"></i> Today
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="ConsultantPortal" asp-action="Upcoming">
+                                    <i class="bi bi-calendar-plus"></i> Upcoming
+                                </a>
+                            </li>
+                        }
+                        else
+                        {
+                            <!-- Customer Menu -->
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="CustomerPortal" asp-action="Dashboard">
+                                    <i class="bi bi-calendar-check"></i> My Appointments
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="Appointments" asp-action="Book">
+                                    <i class="bi bi-calendar-plus"></i> Book Appointment
+                                </a>
+                            </li>
+                        }
+                        
+                        <!-- Common items for all authenticated users -->
                         <li class="nav-item">
-                            <a class="nav-link" asp-controller="Appointments" asp-action="Book">Book</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" asp-controller="Appointments" asp-action="Lookup">Lookup</a>
+                            <a class="nav-link" asp-controller="Appointments" asp-action="Lookup">
+                                <i class="bi bi-search"></i> Lookup
+                            </a>
                         </li>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">

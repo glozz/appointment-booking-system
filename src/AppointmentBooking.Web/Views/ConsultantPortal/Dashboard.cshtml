@@ -1,0 +1,209 @@
+@model ConsultantDashboardViewModel
+@{
+    ViewData["Title"] = "My Schedule";
+}
+
+<div class="container my-5">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1><i class="bi bi-calendar2-week text-primary"></i> My Schedule</h1>
+                    <p class="text-muted mb-0">
+                        Welcome, @(Model.Consultant?.FullName ?? "Consultant") | 
+                        <strong>@Model.Date.ToString("dddd, MMMM dd, yyyy")</strong>
+                    </p>
+                </div>
+                <div>
+                    <a asp-action="TodaySchedule" class="btn btn-outline-primary me-2">
+                        <i class="bi bi-calendar-day"></i> Today's Details
+                    </a>
+                    <a asp-action="Schedule" asp-route-date="@Model.Date.ToString("yyyy-MM-dd")" class="btn btn-outline-secondary">
+                        <i class="bi bi-calendar3"></i> View Calendar
+                    </a>
+                </div>
+            </div>
+            
+            @if (TempData["SuccessMessage"] != null)
+            {
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="bi bi-check-circle"></i> @TempData["SuccessMessage"]
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            }
+            
+            @if (TempData["ErrorMessage"] != null)
+            {
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="bi bi-exclamation-circle"></i> @TempData["ErrorMessage"]
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            }
+            
+            <!-- Summary Cards -->
+            <div class="row mb-4">
+                <div class="col-md-4 mb-3">
+                    <div class="card text-center h-100 border-primary">
+                        <div class="card-body">
+                            <i class="bi bi-calendar-check display-4 text-primary"></i>
+                            <h3 class="mt-2">@Model.TotalToday</h3>
+                            <p class="text-muted mb-0">Today's Appointments</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <div class="card text-center h-100 border-success">
+                        <div class="card-body">
+                            <i class="bi bi-check-circle display-4 text-success"></i>
+                            <h3 class="mt-2">@Model.CompletedToday</h3>
+                            <p class="text-muted mb-0">Completed</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <div class="card text-center h-100 border-warning">
+                        <div class="card-body">
+                            <i class="bi bi-hourglass-split display-4 text-warning"></i>
+                            <h3 class="mt-2">@Model.RemainingToday</h3>
+                            <p class="text-muted mb-0">Remaining</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Today's Appointments Timeline -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-clock-history"></i> Today's Schedule</h5>
+                    <span class="badge bg-light text-dark">@Model.TotalToday appointments</span>
+                </div>
+                <div class="card-body p-0">
+                    @if (Model.TimeSlots.Any(s => s.IsBooked))
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 100px;">Time</th>
+                                        <th>Customer</th>
+                                        <th>Service</th>
+                                        <th>Contact</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var slot in Model.TimeSlots.Where(s => s.IsBooked && s.Appointment != null))
+                                    {
+                                        var apt = slot.Appointment!;
+                                        var isPast = DateTime.Now.TimeOfDay > apt.EndTime;
+                                        var isNow = DateTime.Now.TimeOfDay >= apt.StartTime && DateTime.Now.TimeOfDay < apt.EndTime;
+                                        <tr class="@(isNow ? "table-warning" : "") @(isPast && apt.Status != AppointmentBooking.Core.Enums.AppointmentStatus.Completed ? "table-light" : "")">
+                                            <td>
+                                                <strong>@apt.StartTime.ToString(@"hh\:mm")</strong>
+                                                <br/>
+                                                <small class="text-muted">@apt.EndTime.ToString(@"hh\:mm")</small>
+                                                @if (isNow)
+                                                {
+                                                    <br/><span class="badge bg-warning text-dark">NOW</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                <strong>@apt.Customer?.FirstName @apt.Customer?.LastName</strong>
+                                                <br/>
+                                                <small class="text-muted"><i class="bi bi-hash"></i>@apt.ConfirmationCode</small>
+                                            </td>
+                                            <td>
+                                                @apt.Service?.Name
+                                                <br/>
+                                                <small class="text-muted">@apt.Service?.DurationMinutes min</small>
+                                            </td>
+                                            <td>
+                                                @if (!string.IsNullOrEmpty(apt.Customer?.Phone))
+                                                {
+                                                    <i class="bi bi-telephone text-primary"></i>
+                                                    <a href="tel:@apt.Customer.Phone">@apt.Customer.Phone</a>
+                                                }
+                                                <br/>
+                                                @if (!string.IsNullOrEmpty(apt.Customer?.Email))
+                                                {
+                                                    <small><i class="bi bi-envelope text-muted"></i> @apt.Customer.Email</small>
+                                                }
+                                            </td>
+                                            <td>
+                                                @{
+                                                    var badgeClass = apt.Status switch
+                                                    {
+                                                        AppointmentBooking.Core.Enums.AppointmentStatus.Confirmed => "bg-success",
+                                                        AppointmentBooking.Core.Enums.AppointmentStatus.Pending => "bg-warning text-dark",
+                                                        AppointmentBooking.Core.Enums.AppointmentStatus.Cancelled => "bg-danger",
+                                                        AppointmentBooking.Core.Enums.AppointmentStatus.Completed => "bg-secondary",
+                                                        AppointmentBooking.Core.Enums.AppointmentStatus.NoShow => "bg-dark",
+                                                        _ => "bg-info"
+                                                    };
+                                                }
+                                                <span class="badge @badgeClass">@apt.Status</span>
+                                            </td>
+                                            <td>
+                                                @if (apt.Status == AppointmentBooking.Core.Enums.AppointmentStatus.Confirmed ||
+                                                     apt.Status == AppointmentBooking.Core.Enums.AppointmentStatus.Pending)
+                                                {
+                                                    <form asp-action="UpdateStatus" method="post" class="d-inline">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="id" value="@apt.Id" />
+                                                        <input type="hidden" name="status" value="@AppointmentBooking.Core.Enums.AppointmentStatus.Completed" />
+                                                        <button type="submit" class="btn btn-success btn-sm">
+                                                            <i class="bi bi-check-circle"></i> Complete
+                                                        </button>
+                                                    </form>
+                                                }
+                                                else if (apt.Status == AppointmentBooking.Core.Enums.AppointmentStatus.Completed)
+                                                {
+                                                    <span class="text-muted"><i class="bi bi-check-all"></i> Done</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center py-5">
+                            <i class="bi bi-calendar-x display-1 text-muted"></i>
+                            <h4 class="mt-3">No Appointments Today</h4>
+                            <p class="text-muted">You don't have any scheduled appointments for today.</p>
+                        </div>
+                    }
+                </div>
+            </div>
+            
+            <!-- Quick Links -->
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5><i class="bi bi-calendar-plus text-primary"></i> Upcoming Appointments</h5>
+                            <p class="text-muted">View your upcoming scheduled appointments.</p>
+                            <a asp-action="Upcoming" class="btn btn-outline-primary">
+                                <i class="bi bi-arrow-right"></i> View Upcoming
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5><i class="bi bi-clock-history text-secondary"></i> Past Appointments</h5>
+                            <p class="text-muted">Review your completed appointments history.</p>
+                            <a asp-action="Past" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-right"></i> View Past
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
