@@ -11,85 +11,171 @@
                     <h2><i class="bi bi-calendar-plus"></i> Book Your Appointment</h2>
                 </div>
                 <div class="card-body">
-                    <form asp-action="Book" method="post">
+                    <!-- Progress Steps -->
+                    <div class="booking-progress mb-4">
+                        <div class="d-flex justify-content-between">
+                            <div class="step active" data-step="1">
+                                <span class="step-number">1</span>
+                                <span class="step-label">Branch & Service</span>
+                            </div>
+                            <div class="step" data-step="2">
+                                <span class="step-number">2</span>
+                                <span class="step-label">Date</span>
+                            </div>
+                            <div class="step" data-step="3">
+                                <span class="step-number">3</span>
+                                <span class="step-label">Time</span>
+                            </div>
+                            <div class="step" data-step="4">
+                                <span class="step-number">4</span>
+                                <span class="step-label">Confirm</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <form asp-action="Book" method="post" id="bookingForm">
                         <div asp-validation-summary="All" class="text-danger mb-3"></div>
                         
-                        <h4 class="mb-3">Appointment Details</h4>
-                        
-                        <div class="mb-3">
-                            <label asp-for="BranchId" class="form-label">Branch</label>
-                            <select asp-for="BranchId" class="form-select" required>
-                                <option value="">-- Select Branch --</option>
-                                @foreach (var branch in ViewBag.Branches)
-                                {
-                                    <option value="@branch.Id">@branch.Name - @branch.City</option>
-                                }
-                            </select>
-                        </div>
-
-                        <div class="mb-3">
-                            <label asp-for="ServiceId" class="form-label">Service</label>
-                            <select asp-for="ServiceId" class="form-select" required>
-                                <option value="">-- Select Service --</option>
-                                @foreach (var service in ViewBag.Services)
-                                {
-                                    <option value="@service.Id">@service.Name (@service.DurationMinutes min)</option>
-                                }
-                            </select>
-                        </div>
-
-
-                        <div class="mb-3">
-                            <label asp-for="AppointmentDate" class="form-label">Date</label>
-                            <input asp-for="AppointmentDate" type="date" class="form-control" required min="@DateTime.Today.ToString("yyyy-MM-dd")" />
-                            <span asp-validation-for="AppointmentDate" class="text-danger"></span>
-                        </div>
-
-                        <div class="mb-3">
-                            <label asp-for="StartTime" class="form-label">Time</label>
-                            <input asp-for="StartTime" type="time" class="form-control" required step="900" min="08:00" max="16:45" />
-                            <small class="text-muted">Operating hours: 08:00 - 17:00 (15-minute slots)</small>
-                            <span asp-validation-for="StartTime" class="text-danger"></span>
-                        </div>
-
-                        <div class="mb-3">
-                            <label asp-for="Notes" class="form-label">Notes (Optional)</label>
-                            <textarea asp-for="Notes" class="form-control" rows="3" maxlength="500"></textarea>
-                        </div>
-
-                        <hr class="my-4" />
-                        <h4 class="mb-3">Your Information</h4>
-                        <p class="text-muted small">Pre-filled from your account details</p>
-
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label asp-for="Customer.FirstName" class="form-label">First Name</label>
-                                <input asp-for="Customer.FirstName" class="form-control" maxlength="50" />
-                                <span asp-validation-for="Customer.FirstName" class="text-danger"></span>
+                        <!-- Step 1: Branch & Service -->
+                        <div class="wizard-step" id="step1">
+                            <h4 class="mb-3"><i class="bi bi-building"></i> Step 1: Select Branch & Service</h4>
+                            
+                            <div class="mb-3">
+                                <label asp-for="BranchId" class="form-label">Branch</label>
+                                <select asp-for="BranchId" class="form-select" required id="branchSelect">
+                                    <option value="">-- Select Branch --</option>
+                                    @foreach (var branch in ViewBag.Branches)
+                                    {
+                                        <option value="@branch.Id">@branch.Name - @branch.City</option>
+                                    }
+                                </select>
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <label asp-for="Customer.LastName" class="form-label">Last Name</label>
-                                <input asp-for="Customer.LastName" class="form-control" maxlength="50" />
-                                <span asp-validation-for="Customer.LastName" class="text-danger"></span>
+
+                            <div class="mb-3">
+                                <label asp-for="ServiceId" class="form-label">Service</label>
+                                <select asp-for="ServiceId" class="form-select" required id="serviceSelect">
+                                    <option value="">-- Select Service --</option>
+                                    @foreach (var service in ViewBag.Services)
+                                    {
+                                        <option value="@service.Id" data-duration="@service.DurationMinutes">@service.Name (@service.DurationMinutes min)</option>
+                                    }
+                                </select>
+                            </div>
+
+                            <div class="d-flex justify-content-end">
+                                <button type="button" class="btn btn-primary" id="toStep2" disabled>
+                                    Next: Select Date <i class="bi bi-arrow-right"></i>
+                                </button>
                             </div>
                         </div>
 
-                        <div class="mb-3">
-                            <label asp-for="Customer.Email" class="form-label">Email</label>
-                            <input asp-for="Customer.Email" type="email" class="form-control"  />
-                            <span asp-validation-for="Customer.Email" class="text-danger"></span>
+                        <!-- Step 2: Date Selection -->
+                        <div class="wizard-step d-none" id="step2">
+                            <h4 class="mb-3"><i class="bi bi-calendar3"></i> Step 2: Select Date</h4>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Available Dates</label>
+                                <div id="availableDatesContainer" class="row g-2">
+                                    <p class="text-muted">Select a branch first to see available dates.</p>
+                                </div>
+                                <input asp-for="AppointmentDate" type="hidden" id="appointmentDateInput" />
+                                <span asp-validation-for="AppointmentDate" class="text-danger"></span>
+                            </div>
+
+                            <div class="d-flex justify-content-between">
+                                <button type="button" class="btn btn-outline-secondary" id="backToStep1">
+                                    <i class="bi bi-arrow-left"></i> Back
+                                </button>
+                                <button type="button" class="btn btn-primary" id="toStep3" disabled>
+                                    Next: Select Time <i class="bi bi-arrow-right"></i>
+                                </button>
+                            </div>
                         </div>
 
-                        <div class="mb-3">
-                            <label asp-for="Customer.Phone" class="form-label">Phone</label>
-                            <input asp-for="Customer.Phone" type="tel" class="form-control" />
-                            <span asp-validation-for="Customer.Phone" class="text-danger"></span>
+                        <!-- Step 3: Time Selection -->
+                        <div class="wizard-step d-none" id="step3">
+                            <h4 class="mb-3"><i class="bi bi-clock"></i> Step 3: Select Time</h4>
+                            
+                            <div id="selectedDateDisplay" class="alert alert-info mb-3">
+                                <i class="bi bi-calendar-check"></i> Selected date: <strong id="displayDate"></strong>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Available Time Slots</label>
+                                <div id="timeSlotsContainer" class="row g-2">
+                                    <p class="text-muted">Select a date first to see available time slots.</p>
+                                </div>
+                                <input asp-for="StartTime" type="hidden" id="startTimeInput" />
+                                <span asp-validation-for="StartTime" class="text-danger"></span>
+                            </div>
+
+                            <div class="d-flex justify-content-between">
+                                <button type="button" class="btn btn-outline-secondary" id="backToStep2">
+                                    <i class="bi bi-arrow-left"></i> Back
+                                </button>
+                                <button type="button" class="btn btn-primary" id="toStep4" disabled>
+                                    Next: Confirm <i class="bi bi-arrow-right"></i>
+                                </button>
+                            </div>
                         </div>
 
-                        <div class="d-grid">
-                            <button type="submit" class="btn btn-primary btn-lg">
-                                <i class="bi bi-check-circle"></i> Confirm Booking
-                            </button>
+                        <!-- Step 4: Confirmation -->
+                        <div class="wizard-step d-none" id="step4">
+                            <h4 class="mb-3"><i class="bi bi-check-circle"></i> Step 4: Confirm Booking</h4>
+                            
+                            <!-- Booking Summary -->
+                            <div class="card bg-light mb-4">
+                                <div class="card-body">
+                                    <h5 class="card-title">Booking Summary</h5>
+                                    <p><strong>Branch:</strong> <span id="summaryBranch"></span></p>
+                                    <p><strong>Service:</strong> <span id="summaryService"></span></p>
+                                    <p><strong>Date:</strong> <span id="summaryDate"></span></p>
+                                    <p><strong>Time:</strong> <span id="summaryTime"></span></p>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label asp-for="Notes" class="form-label">Notes (Optional)</label>
+                                <textarea asp-for="Notes" class="form-control" rows="3" maxlength="500" placeholder="Any special requests or notes..."></textarea>
+                            </div>
+
+                            <hr class="my-4" />
+                            <h5 class="mb-3">Your Information</h5>
+                            <p class="text-muted small">Pre-filled from your account details</p>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label asp-for="Customer.FirstName" class="form-label">First Name</label>
+                                    <input asp-for="Customer.FirstName" class="form-control" maxlength="50" />
+                                    <span asp-validation-for="Customer.FirstName" class="text-danger"></span>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label asp-for="Customer.LastName" class="form-label">Last Name</label>
+                                    <input asp-for="Customer.LastName" class="form-control" maxlength="50" />
+                                    <span asp-validation-for="Customer.LastName" class="text-danger"></span>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label asp-for="Customer.Email" class="form-label">Email</label>
+                                <input asp-for="Customer.Email" type="email" class="form-control" />
+                                <span asp-validation-for="Customer.Email" class="text-danger"></span>
+                            </div>
+
+                            <div class="mb-3">
+                                <label asp-for="Customer.Phone" class="form-label">Phone</label>
+                                <input asp-for="Customer.Phone" type="tel" class="form-control" />
+                                <span asp-validation-for="Customer.Phone" class="text-danger"></span>
+                            </div>
+
+                            <div class="d-flex justify-content-between">
+                                <button type="button" class="btn btn-outline-secondary" id="backToStep3">
+                                    <i class="bi bi-arrow-left"></i> Back
+                                </button>
+                                <button type="submit" class="btn btn-primary btn-lg">
+                                    <i class="bi bi-check-circle"></i> Confirm Booking
+                                </button>
+                            </div>
                         </div>
                     </form>
                 </div>
@@ -98,6 +184,264 @@
     </div>
 </div>
 
+<style>
+    .booking-progress {
+        padding: 20px 0;
+    }
+    .booking-progress .step {
+        text-align: center;
+        flex: 1;
+        position: relative;
+    }
+    .booking-progress .step-number {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: #e9ecef;
+        color: #6c757d;
+        font-weight: bold;
+        margin-bottom: 8px;
+    }
+    .booking-progress .step.active .step-number,
+    .booking-progress .step.completed .step-number {
+        background: var(--bs-primary);
+        color: white;
+    }
+    .booking-progress .step-label {
+        display: block;
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+    .booking-progress .step.active .step-label {
+        color: var(--bs-primary);
+        font-weight: 600;
+    }
+    .date-btn, .time-slot-btn {
+        min-width: 100px;
+        transition: all 0.2s;
+    }
+    .date-btn:hover:not(:disabled), .time-slot-btn:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    .date-btn.selected, .time-slot-btn.selected {
+        background-color: var(--bs-primary);
+        border-color: var(--bs-primary);
+        color: white;
+    }
+    .time-slot-btn .availability-badge {
+        font-size: 0.7rem;
+        display: block;
+        margin-top: 4px;
+    }
+    .time-slot-btn.last-slot {
+        border-color: #fd7e14;
+    }
+    .time-slot-btn.last-slot .availability-badge {
+        color: #fd7e14;
+        font-weight: bold;
+    }
+</style>
+
 @section Scripts {
     @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); }
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const branchSelect = document.getElementById('branchSelect');
+            const serviceSelect = document.getElementById('serviceSelect');
+            const toStep2Btn = document.getElementById('toStep2');
+            const toStep3Btn = document.getElementById('toStep3');
+            const toStep4Btn = document.getElementById('toStep4');
+            const backToStep1Btn = document.getElementById('backToStep1');
+            const backToStep2Btn = document.getElementById('backToStep2');
+            const backToStep3Btn = document.getElementById('backToStep3');
+            const appointmentDateInput = document.getElementById('appointmentDateInput');
+            const startTimeInput = document.getElementById('startTimeInput');
+            const availableDatesContainer = document.getElementById('availableDatesContainer');
+            const timeSlotsContainer = document.getElementById('timeSlotsContainer');
+
+            let selectedDate = null;
+            let selectedTime = null;
+
+            // Enable/disable Step 2 button based on branch/service selection
+            function checkStep1Complete() {
+                toStep2Btn.disabled = !(branchSelect.value && serviceSelect.value);
+            }
+
+            branchSelect.addEventListener('change', checkStep1Complete);
+            serviceSelect.addEventListener('change', checkStep1Complete);
+
+            // Navigation between steps
+            function showStep(stepNumber) {
+                document.querySelectorAll('.wizard-step').forEach(step => step.classList.add('d-none'));
+                document.getElementById('step' + stepNumber).classList.remove('d-none');
+                
+                document.querySelectorAll('.booking-progress .step').forEach((step, index) => {
+                    step.classList.remove('active', 'completed');
+                    if (index + 1 < stepNumber) step.classList.add('completed');
+                    if (index + 1 === stepNumber) step.classList.add('active');
+                });
+            }
+
+            // Step 1 -> Step 2
+            toStep2Btn.addEventListener('click', async function() {
+                showStep(2);
+                await loadAvailableDates();
+            });
+
+            // Step 2 -> Step 1
+            backToStep1Btn.addEventListener('click', () => showStep(1));
+
+            // Step 2 -> Step 3
+            toStep3Btn.addEventListener('click', async function() {
+                showStep(3);
+                document.getElementById('displayDate').textContent = formatDate(selectedDate);
+                await loadTimeSlots();
+            });
+
+            // Step 3 -> Step 2
+            backToStep2Btn.addEventListener('click', () => showStep(2));
+
+            // Step 3 -> Step 4
+            toStep4Btn.addEventListener('click', function() {
+                showStep(4);
+                updateSummary();
+            });
+
+            // Step 4 -> Step 3
+            backToStep3Btn.addEventListener('click', () => showStep(3));
+
+            // Load available dates
+            async function loadAvailableDates() {
+                const branchId = branchSelect.value;
+                availableDatesContainer.innerHTML = '<p class="text-muted">Loading available dates...</p>';
+                
+                try {
+                    const response = await fetch(`/Appointments/GetAvailableDates?branchId=${branchId}&daysAhead=30`);
+                    const dates = await response.json();
+                    
+                    if (dates.length === 0) {
+                        availableDatesContainer.innerHTML = '<p class="text-warning">No available dates found. Please try a different branch.</p>';
+                        return;
+                    }
+
+                    let html = '';
+                    dates.slice(0, 14).forEach(date => {
+                        const displayDate = formatDate(date);
+                        const dayName = new Date(date).toLocaleDateString('en-US', { weekday: 'short' });
+                        html += `
+                            <div class="col-6 col-md-4 col-lg-3">
+                                <button type="button" class="btn btn-outline-primary date-btn w-100 py-3" data-date="${date}">
+                                    <strong>${dayName}</strong><br>
+                                    <span class="small">${displayDate}</span>
+                                </button>
+                            </div>
+                        `;
+                    });
+                    availableDatesContainer.innerHTML = html;
+
+                    // Add click handlers for date buttons
+                    document.querySelectorAll('.date-btn').forEach(btn => {
+                        btn.addEventListener('click', function() {
+                            document.querySelectorAll('.date-btn').forEach(b => b.classList.remove('selected'));
+                            this.classList.add('selected');
+                            selectedDate = this.dataset.date;
+                            appointmentDateInput.value = selectedDate;
+                            toStep3Btn.disabled = false;
+                        });
+                    });
+                } catch (error) {
+                    availableDatesContainer.innerHTML = '<p class="text-danger">Error loading dates. Please try again.</p>';
+                }
+            }
+
+            // Load time slots
+            async function loadTimeSlots() {
+                const branchId = branchSelect.value;
+                const serviceId = serviceSelect.value;
+                timeSlotsContainer.innerHTML = '<p class="text-muted">Loading available time slots...</p>';
+                
+                try {
+                    const response = await fetch(`/Appointments/GetAvailableSlots?branchId=${branchId}&serviceId=${serviceId}&date=${selectedDate}`);
+                    const slots = await response.json();
+                    
+                    const availableSlots = slots.filter(s => s.isAvailable);
+                    if (availableSlots.length === 0) {
+                        timeSlotsContainer.innerHTML = '<p class="text-warning">No available time slots for this date. Please select another date.</p>';
+                        return;
+                    }
+
+                    let html = '';
+                    availableSlots.forEach(slot => {
+                        const startTime = formatTime(slot.startTime);
+                        const endTime = formatTime(slot.endTime);
+                        const availableCount = slot.availableConsultantCount;
+                        const totalCount = slot.totalConsultantCount;
+                        const isLastSlot = availableCount === 1;
+                        const lastSlotClass = isLastSlot ? 'last-slot' : '';
+                        const availabilityText = isLastSlot 
+                            ? 'Last slot!' 
+                            : `${availableCount} of ${totalCount} available`;
+                        
+                        html += `
+                            <div class="col-6 col-md-4 col-lg-3">
+                                <button type="button" class="btn btn-outline-primary time-slot-btn w-100 py-3 ${lastSlotClass}" 
+                                        data-start="${slot.startTime}" data-end="${slot.endTime}">
+                                    <strong>${startTime}</strong>
+                                    <span class="availability-badge">${availabilityText}</span>
+                                </button>
+                            </div>
+                        `;
+                    });
+                    timeSlotsContainer.innerHTML = html;
+
+                    // Add click handlers for time slot buttons
+                    document.querySelectorAll('.time-slot-btn').forEach(btn => {
+                        btn.addEventListener('click', function() {
+                            document.querySelectorAll('.time-slot-btn').forEach(b => b.classList.remove('selected'));
+                            this.classList.add('selected');
+                            selectedTime = this.dataset.start;
+                            startTimeInput.value = selectedTime;
+                            toStep4Btn.disabled = false;
+                        });
+                    });
+                } catch (error) {
+                    timeSlotsContainer.innerHTML = '<p class="text-danger">Error loading time slots. Please try again.</p>';
+                }
+            }
+
+            // Update booking summary
+            function updateSummary() {
+                document.getElementById('summaryBranch').textContent = branchSelect.options[branchSelect.selectedIndex].text;
+                document.getElementById('summaryService').textContent = serviceSelect.options[serviceSelect.selectedIndex].text;
+                document.getElementById('summaryDate').textContent = formatDate(selectedDate);
+                document.getElementById('summaryTime').textContent = formatTime(selectedTime);
+            }
+
+            // Helper functions
+            function formatDate(dateString) {
+                const date = new Date(dateString);
+                return date.toLocaleDateString('en-US', { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                });
+            }
+
+            function formatTime(timeString) {
+                // Handle TimeSpan format "HH:MM:SS" or "HH:MM:SS.xxx"
+                const parts = timeString.split(':');
+                const hours = parseInt(parts[0]);
+                const minutes = parts[1];
+                const ampm = hours >= 12 ? 'PM' : 'AM';
+                const displayHours = hours % 12 || 12;
+                return `${displayHours}:${minutes} ${ampm}`;
+            }
+        });
+    </script>
 }
+

@@ -66,9 +66,6 @@ public class AppointmentService : IAppointmentService
         // Validate operating hours
         await ValidateOperatingHoursAsync(dto.BranchId, dto.AppointmentDate, dto.StartTime, endTime);
 
-        // Double-booking prevention: check if slot already exists for this branch
-        await ValidateNoDoubleBookingAsync(dto.BranchId, dto.AppointmentDate, dto.StartTime);
-
         // Customer cross-branch conflict detection: prevent same customer from booking at overlapping times
         await ValidateCustomerAvailabilityAsync(dto.Customer.Email, dto.BranchId, dto.AppointmentDate, dto.StartTime, endTime);
 
@@ -194,25 +191,6 @@ public class AppointmentService : IAppointmentService
             _logger.LogWarning("Appointment time {StartTime}-{EndTime} outside operating hours {OpenTime}-{CloseTime}", 
                 startTime, endTime, openTime, closeTime);
             throw new ValidationException($"Appointments are only available during operating hours ({openTime:hh\\:mm} - {closeTime:hh\\:mm}).");
-        }
-    }
-
-    /// <summary>
-    /// Checks if a booking already exists for the same branch, date, and start time
-    /// </summary>
-    private async Task ValidateNoDoubleBookingAsync(int branchId, DateTime date, TimeSpan startTime)
-    {
-        var existingAppointments = await _unitOfWork.Appointments.FindAsync(a =>
-            a.BranchId == branchId &&
-            a.AppointmentDate == date &&
-            a.StartTime == startTime &&
-            a.Status != AppointmentStatus.Cancelled);
-
-        if (existingAppointments.Any())
-        {
-            _logger.LogWarning("Double booking detected for branch {BranchId} on {Date} at {Time}", 
-                branchId, date, startTime);
-            throw new ConflictException("This time slot is already booked. Please choose another time.");
         }
     }
 

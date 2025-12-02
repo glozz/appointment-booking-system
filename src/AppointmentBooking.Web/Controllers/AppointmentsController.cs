@@ -229,4 +229,11 @@ public class AppointmentsController : Controller
         var slots = await _availabilityService.GetAvailableSlotsAsync(branchId, serviceId, date);
         return Json(slots);
     }
+
+    [HttpGet]
+    public async Task<IActionResult> GetAvailableDates(int branchId, int daysAhead = 30)
+    {
+        var dates = await _availabilityService.GetAvailableDatesAsync(branchId, daysAhead);
+        return Json(dates.Select(d => d.ToString("yyyy-MM-dd")));
+    }
 }
