@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using AppointmentBooking.Application.Interfaces;
 using AppointmentBooking.Core.Enums;
+using AppointmentBooking.Web.Models;
 
 namespace AppointmentBooking.Web.Controllers;
 
@@ -23,9 +24,17 @@ public class CustomerPortalController : Controller
     }
 
     /// <summary>
-    /// Dashboard view showing customer's appointments overview
+    /// Index redirects to Dashboard
     /// </summary>
-    public async Task<IActionResult> Index()
+    public IActionResult Index()
+    {
+        return RedirectToAction(nameof(Dashboard));
+    }
+
+    /// <summary>
+    /// Dashboard view showing customer's appointments overview with tabs
+    /// </summary>
+    public async Task<IActionResult> Dashboard()
     {
         var email = GetCurrentUserEmail();
         if (string.IsNullOrEmpty(email))
@@ -36,10 +45,77 @@ public class CustomerPortalController : Controller
         var upcoming = await _appointmentService.GetCustomerUpcomingAppointmentsAsync(email);
         var past = await _appointmentService.GetCustomerPastAppointmentsAsync(email);
         
-        ViewBag.UpcomingAppointments = upcoming;
-        ViewBag.PastAppointments = past.Take(5); // Show only recent 5 past appointments
+        var upcomingList = upcoming.ToList();
+        var pastList = past.ToList();
         
-        return View();
+        var viewModel = new CustomerDashboardViewModel
+        {
+            UpcomingAppointments = upcomingList,
+            PastAppointments = pastList.Take(5), // Show only recent 5 past appointments
+            TotalAppointments = upcomingList.Count + pastList.Count,
+            UpcomingCount = upcomingList.Count,
+            CompletedCount = pastList.Count(a => a.Status == AppointmentStatus.Completed)
+        };
+        
+        return View(viewModel);
+    }
+
+    /// <summary>
+    /// View appointment details
+    /// </summary>
+    public async Task<IActionResult> Details(int id)
+    {
+        var email = GetCurrentUserEmail();
+        if (string.IsNullOrEmpty(email))
+        {
+            return RedirectToAction("Login", "Account");
+        }
+
+        var appointment = await _appointmentService.GetAppointmentByIdAsync(id);
+        if (appointment == null)
+        {
+            return NotFound();
+        }
+
+        // Verify the customer owns this appointment
+        if (!string.Equals(appointment.Customer?.Email, email, StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning("User {Email} attempted to access appointment {Id} belonging to another customer", email, id);
+            return Forbid();
+        }
+
+        return View(appointment);
+    }
+
+    /// <summary>
+    /// Cancel an appointment
+    /// </summary>
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Cancel(int id, string reason)
+    {
+        var email = GetCurrentUserEmail();
+        if (string.IsNullOrEmpty(email))
+        {
+            return RedirectToAction("Login", "Account");
+        }
+
+        var appointment = await _appointmentService.GetAppointmentByIdAsync(id);
+        if (appointment == null)
+        {
+            return NotFound();
+        }
+
+        // Verify the customer owns this appointment
+        if (!string.Equals(appointment.Customer?.Email, email, StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning("User {Email} attempted to cancel appointment {Id} belonging to another customer", email, id);
+            return Forbid();
+        }
+
+        await _appointmentService.CancelAppointmentAsync(id, reason);
+        TempData["SuccessMessage"] = "Appointment cancelled successfully.";
+        return RedirectToAction(nameof(Dashboard));
     }
 
     /// <summary>

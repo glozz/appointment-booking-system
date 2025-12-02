@@ -1,0 +1,195 @@
+@model ConsultantDashboardViewModel
+@{
+    ViewData["Title"] = "Schedule";
+    var selectedDate = ViewBag.SelectedDate as DateTime? ?? Model.Date;
+    var prevDate = selectedDate.AddDays(-1);
+    var nextDate = selectedDate.AddDays(1);
+    var isToday = selectedDate.Date == DateTime.Today;
+}
+
+<div class="container my-5">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1><i class="bi bi-calendar3 text-primary"></i> Schedule</h1>
+                    <p class="text-muted mb-0">
+                        @(Model.Consultant?.FullName ?? "Consultant")
+                    </p>
+                </div>
+                <a asp-action="Dashboard" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Back to Dashboard
+                </a>
+            </div>
+            
+            @if (TempData["SuccessMessage"] != null)
+            {
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="bi bi-check-circle"></i> @TempData["SuccessMessage"]
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            }
+            
+            <!-- Date Navigation -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-4 text-start">
+                            <a asp-action="Schedule" asp-route-date="@prevDate.ToString("yyyy-MM-dd")" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left"></i> @prevDate.ToString("MMM dd")
+                            </a>
+                        </div>
+                        <div class="col-md-4 text-center">
+                            <form asp-action="Schedule" method="get" class="d-inline-flex align-items-center gap-2">
+                                <input type="date" name="date" value="@selectedDate.ToString("yyyy-MM-dd")" class="form-control" style="width: auto;" onchange="this.form.submit()" />
+                            </form>
+                            <br/>
+                            <h4 class="mt-2 mb-0">@selectedDate.ToString("dddd, MMMM dd, yyyy")</h4>
+                            @if (isToday)
+                            {
+                                <span class="badge bg-primary">Today</span>
+                            }
+                        </div>
+                        <div class="col-md-4 text-end">
+                            @if (!isToday)
+                            {
+                                <a asp-action="Schedule" asp-route-date="@DateTime.Today.ToString("yyyy-MM-dd")" class="btn btn-primary me-2">
+                                    <i class="bi bi-calendar-day"></i> Today
+                                </a>
+                            }
+                            <a asp-action="Schedule" asp-route-date="@nextDate.ToString("yyyy-MM-dd")" class="btn btn-outline-secondary">
+                                @nextDate.ToString("MMM dd") <i class="bi bi-arrow-right"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Summary -->
+            <div class="row mb-4">
+                <div class="col-md-4 mb-3">
+                    <div class="card text-center border-primary">
+                        <div class="card-body py-3">
+                            <h4 class="mb-0 text-primary">@Model.TotalToday</h4>
+                            <small class="text-muted">Appointments</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <div class="card text-center border-success">
+                        <div class="card-body py-3">
+                            <h4 class="mb-0 text-success">@Model.CompletedToday</h4>
+                            <small class="text-muted">Completed</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <div class="card text-center border-info">
+                        <div class="card-body py-3">
+                            <h4 class="mb-0 text-info">@Model.TimeSlots.Count(s => !s.IsBooked)</h4>
+                            <small class="text-muted">Available Slots</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Schedule Timeline -->
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-clock"></i> Schedule for @selectedDate.ToString("MMMM dd, yyyy")</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-bordered mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 80px;">Time</th>
+                                    <th>Appointment Details</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var slot in Model.TimeSlots)
+                                {
+                                    var isNow = isToday && DateTime.Now.TimeOfDay >= slot.Time && DateTime.Now.TimeOfDay < slot.Time.Add(TimeSpan.FromMinutes(30));
+                                    var isPast = isToday && DateTime.Now.TimeOfDay > slot.Time.Add(TimeSpan.FromMinutes(30));
+                                    var isDatePast = selectedDate.Date < DateTime.Today;
+                                    
+                                    <tr class="@(isNow ? "table-warning" : "") @((isPast || isDatePast) && !slot.IsBooked ? "table-light" : "")">
+                                        <td class="text-center align-middle fw-bold @(isPast || isDatePast ? "text-muted" : "")">
+                                            @slot.Time.ToString(@"hh\:mm")
+                                            @if (isNow)
+                                            {
+                                                <br/><span class="badge bg-warning text-dark">NOW</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (slot.IsBooked && slot.Appointment != null)
+                                            {
+                                                var apt = slot.Appointment;
+                                                <div class="d-flex justify-content-between align-items-start">
+                                                    <div>
+                                                        <strong class="fs-5">@apt.Customer?.FirstName @apt.Customer?.LastName</strong>
+                                                        @{
+                                                            var badgeClass = apt.Status switch
+                                                            {
+                                                                AppointmentBooking.Core.Enums.AppointmentStatus.Confirmed => "bg-success",
+                                                                AppointmentBooking.Core.Enums.AppointmentStatus.Pending => "bg-warning text-dark",
+                                                                AppointmentBooking.Core.Enums.AppointmentStatus.Cancelled => "bg-danger",
+                                                                AppointmentBooking.Core.Enums.AppointmentStatus.Completed => "bg-secondary",
+                                                                _ => "bg-info"
+                                                            };
+                                                        }
+                                                        <span class="badge @badgeClass ms-2">@apt.Status</span>
+                                                        <br/>
+                                                        <span class="text-muted">
+                                                            <i class="bi bi-list-check"></i> @apt.Service?.Name (@apt.Service?.DurationMinutes min)
+                                                        </span>
+                                                        <br/>
+                                                        <small>
+                                                            @if (!string.IsNullOrEmpty(apt.Customer?.Phone))
+                                                            {
+                                                                <i class="bi bi-telephone text-primary"></i>
+                                                                <a href="tel:@apt.Customer.Phone">@apt.Customer.Phone</a>
+                                                                <span class="mx-2">|</span>
+                                                            }
+                                                            <i class="bi bi-hash"></i><code>@apt.ConfirmationCode</code>
+                                                        </small>
+                                                        @if (!string.IsNullOrEmpty(apt.Notes))
+                                                        {
+                                                            <br/>
+                                                            <small class="text-info"><i class="bi bi-chat-left-text"></i> @apt.Notes</small>
+                                                        }
+                                                    </div>
+                                                    <div>
+                                                        @if (!isDatePast && (apt.Status == AppointmentBooking.Core.Enums.AppointmentStatus.Confirmed ||
+                                                             apt.Status == AppointmentBooking.Core.Enums.AppointmentStatus.Pending))
+                                                        {
+                                                            <form asp-action="UpdateStatus" method="post" class="d-inline">
+                                                                @Html.AntiForgeryToken()
+                                                                <input type="hidden" name="id" value="@apt.Id" />
+                                                                <input type="hidden" name="status" value="@AppointmentBooking.Core.Enums.AppointmentStatus.Completed" />
+                                                                <button type="submit" class="btn btn-success btn-sm">
+                                                                    <i class="bi bi-check-circle"></i> Mark Complete
+                                                                </button>
+                                                            </form>
+                                                        }
+                                                    </div>
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted fst-italic">
+                                                    <i class="bi bi-calendar-x"></i> Available
+                                                </span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
