@@ -1,11 +1,26 @@
 @model ConsultantDashboardViewModel
 @{
     ViewData["Title"] = "My Schedule";
+    var isAdmin = ViewBag.IsAdmin as bool? ?? false;
+    var selectedConsultantId = ViewBag.SelectedConsultantId as int?;
 }
 
 <div class="container my-5">
     <div class="row">
         <div class="col-12">
+            @if (isAdmin)
+            {
+                <div class="alert alert-info d-flex justify-content-between align-items-center mb-4">
+                    <span>
+                        <i class="bi bi-shield-check"></i> 
+                        <strong>Admin View:</strong> Viewing @(Model.Consultant?.FullName ?? "Consultant")'s schedule
+                    </span>
+                    <a asp-action="Dashboard" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-arrow-left-right"></i> Switch Consultant
+                    </a>
+                </div>
+            }
+            
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div>
                     <h1><i class="bi bi-calendar2-week text-primary"></i> My Schedule</h1>
@@ -15,10 +30,10 @@
                     </p>
                 </div>
                 <div>
-                    <a asp-action="TodaySchedule" class="btn btn-outline-primary me-2">
+                    <a asp-action="TodaySchedule" asp-route-consultantId="@selectedConsultantId" class="btn btn-outline-primary me-2">
                         <i class="bi bi-calendar-day"></i> Today's Details
                     </a>
-                    <a asp-action="Schedule" asp-route-date="@Model.Date.ToString("yyyy-MM-dd")" class="btn btn-outline-secondary">
+                    <a asp-action="Schedule" asp-route-date="@Model.Date.ToString("yyyy-MM-dd")" asp-route-consultantId="@selectedConsultantId" class="btn btn-outline-secondary">
                         <i class="bi bi-calendar3"></i> View Calendar
                     </a>
                 </div>
@@ -152,6 +167,10 @@
                                                         @Html.AntiForgeryToken()
                                                         <input type="hidden" name="id" value="@apt.Id" />
                                                         <input type="hidden" name="status" value="@AppointmentBooking.Core.Enums.AppointmentStatus.Completed" />
+                                                        @if (selectedConsultantId.HasValue)
+                                                        {
+                                                            <input type="hidden" name="consultantId" value="@selectedConsultantId.Value" />
+                                                        }
                                                         <button type="submit" class="btn btn-success btn-sm">
                                                             <i class="bi bi-check-circle"></i> Complete
                                                         </button>
@@ -186,7 +205,7 @@
                         <div class="card-body">
                             <h5><i class="bi bi-calendar-plus text-primary"></i> Upcoming Appointments</h5>
                             <p class="text-muted">View your upcoming scheduled appointments.</p>
-                            <a asp-action="Upcoming" class="btn btn-outline-primary">
+                            <a asp-action="Upcoming" asp-route-consultantId="@selectedConsultantId" class="btn btn-outline-primary">
                                 <i class="bi bi-arrow-right"></i> View Upcoming
                             </a>
                         </div>
@@ -197,7 +216,7 @@
                         <div class="card-body">
                             <h5><i class="bi bi-clock-history text-secondary"></i> Past Appointments</h5>
                             <p class="text-muted">Review your completed appointments history.</p>
-                            <a asp-action="Past" class="btn btn-outline-secondary">
+                            <a asp-action="Past" asp-route-consultantId="@selectedConsultantId" class="btn btn-outline-secondary">
                                 <i class="bi bi-arrow-right"></i> View Past
                             </a>
                         </div>

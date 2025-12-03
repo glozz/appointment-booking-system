@@ -37,16 +37,26 @@ public class ConsultantPortalController : Controller
     /// <summary>
     /// Dashboard view showing today's schedule and upcoming appointments
     /// </summary>
-    public async Task<IActionResult> Dashboard()
+    public async Task<IActionResult> Dashboard(int? consultantId = null)
     {
-        var consultantId = await GetCurrentConsultantIdAsync();
-        if (consultantId == null)
+        var actualConsultantId = await GetCurrentConsultantIdAsync(consultantId);
+        
+        // Admin without selection → show consultant picker
+        if (actualConsultantId == null && User.IsInRole("Admin"))
+        {
+            var allConsultants = await _consultantService.GetAllConsultantsAsync();
+            ViewBag.ReturnAction = "Dashboard";
+            return View("SelectConsultant", allConsultants);
+        }
+        
+        // Not authorized
+        if (actualConsultantId == null)
         {
             return RedirectToAction("AccessDenied", "Account");
         }
 
-        var consultant = await _consultantService.GetConsultantByIdAsync(consultantId.Value);
-        var todayAppointments = await _appointmentService.GetConsultantTodayAppointmentsAsync(consultantId.Value);
+        var consultant = await _consultantService.GetConsultantByIdAsync(actualConsultantId.Value);
+        var todayAppointments = await _appointmentService.GetConsultantTodayAppointmentsAsync(actualConsultantId.Value);
         var todayList = todayAppointments.ToList();
         
         // Generate time slots for the day (08:00 - 17:00 with 30-minute intervals)
@@ -63,22 +73,36 @@ public class ConsultantPortalController : Controller
             TimeSlots = timeSlots
         };
         
+        // Store for navigation and admin banner
+        ViewBag.SelectedConsultantId = actualConsultantId.Value;
+        ViewBag.IsAdmin = User.IsInRole("Admin");
+        
         return View(viewModel);
     }
 
     /// <summary>
     /// Detailed view of today's schedule with timeline
     /// </summary>
-    public async Task<IActionResult> TodaySchedule()
+    public async Task<IActionResult> TodaySchedule(int? consultantId = null)
     {
-        var consultantId = await GetCurrentConsultantIdAsync();
-        if (consultantId == null)
+        var actualConsultantId = await GetCurrentConsultantIdAsync(consultantId);
+        
+        // Admin without selection → show consultant picker
+        if (actualConsultantId == null && User.IsInRole("Admin"))
+        {
+            var allConsultants = await _consultantService.GetAllConsultantsAsync();
+            ViewBag.ReturnAction = "TodaySchedule";
+            return View("SelectConsultant", allConsultants);
+        }
+        
+        // Not authorized
+        if (actualConsultantId == null)
         {
             return RedirectToAction("AccessDenied", "Account");
         }
 
-        var consultant = await _consultantService.GetConsultantByIdAsync(consultantId.Value);
-        var todayAppointments = await _appointmentService.GetConsultantTodayAppointmentsAsync(consultantId.Value);
+        var consultant = await _consultantService.GetConsultantByIdAsync(actualConsultantId.Value);
+        var todayAppointments = await _appointmentService.GetConsultantTodayAppointmentsAsync(actualConsultantId.Value);
         var todayList = todayAppointments.ToList();
         
         var timeSlots = GenerateTimeSlots(todayList);
@@ -94,55 +118,104 @@ public class ConsultantPortalController : Controller
             TimeSlots = timeSlots
         };
         
+        // Store for navigation and admin banner
+        ViewBag.SelectedConsultantId = actualConsultantId.Value;
+        ViewBag.IsAdmin = User.IsInRole("Admin");
+        
         return View(viewModel);
     }
 
     /// <summary>
     /// View upcoming appointments
     /// </summary>
-    public async Task<IActionResult> Upcoming()
+    public async Task<IActionResult> Upcoming(int? consultantId = null)
     {
-        var consultantId = await GetCurrentConsultantIdAsync();
-        if (consultantId == null)
+        var actualConsultantId = await GetCurrentConsultantIdAsync(consultantId);
+        
+        // Admin without selection → show consultant picker
+        if (actualConsultantId == null && User.IsInRole("Admin"))
+        {
+            var allConsultants = await _consultantService.GetAllConsultantsAsync();
+            ViewBag.ReturnAction = "Upcoming";
+            return View("SelectConsultant", allConsultants);
+        }
+        
+        // Not authorized
+        if (actualConsultantId == null)
         {
             return RedirectToAction("AccessDenied", "Account");
         }
 
-        var appointments = await _appointmentService.GetConsultantUpcomingAppointmentsAsync(consultantId.Value);
+        var consultant = await _consultantService.GetConsultantByIdAsync(actualConsultantId.Value);
+        var appointments = await _appointmentService.GetConsultantUpcomingAppointmentsAsync(actualConsultantId.Value);
+        
+        // Store for navigation and admin banner
+        ViewBag.SelectedConsultantId = actualConsultantId.Value;
+        ViewBag.IsAdmin = User.IsInRole("Admin");
+        ViewBag.ConsultantName = consultant?.FullName ?? "Consultant";
+        
         return View(appointments);
     }
 
     /// <summary>
     /// View past appointments
     /// </summary>
-    public async Task<IActionResult> Past()
+    public async Task<IActionResult> Past(int? consultantId = null)
     {
-        var consultantId = await GetCurrentConsultantIdAsync();
-        if (consultantId == null)
+        var actualConsultantId = await GetCurrentConsultantIdAsync(consultantId);
+        
+        // Admin without selection → show consultant picker
+        if (actualConsultantId == null && User.IsInRole("Admin"))
+        {
+            var allConsultants = await _consultantService.GetAllConsultantsAsync();
+            ViewBag.ReturnAction = "Past";
+            return View("SelectConsultant", allConsultants);
+        }
+        
+        // Not authorized
+        if (actualConsultantId == null)
         {
             return RedirectToAction("AccessDenied", "Account");
         }
 
-        var appointments = await _appointmentService.GetConsultantPastAppointmentsAsync(consultantId.Value);
+        var consultant = await _consultantService.GetConsultantByIdAsync(actualConsultantId.Value);
+        var appointments = await _appointmentService.GetConsultantPastAppointmentsAsync(actualConsultantId.Value);
+        
+        // Store for navigation and admin banner
+        ViewBag.SelectedConsultantId = actualConsultantId.Value;
+        ViewBag.IsAdmin = User.IsInRole("Admin");
+        ViewBag.ConsultantName = consultant?.FullName ?? "Consultant";
+        
         return View(appointments);
     }
 
     /// <summary>
     /// View schedule for a specific date
     /// </summary>
-    public async Task<IActionResult> Schedule(DateTime? date)
+    public async Task<IActionResult> Schedule(DateTime? date = null, int? consultantId = null)
     {
-        var consultantId = await GetCurrentConsultantIdAsync();
-        if (consultantId == null)
+        var actualConsultantId = await GetCurrentConsultantIdAsync(consultantId);
+        
+        // Admin without selection → show consultant picker
+        if (actualConsultantId == null && User.IsInRole("Admin"))
+        {
+            var allConsultants = await _consultantService.GetAllConsultantsAsync();
+            ViewBag.ReturnAction = "Schedule";
+            ViewBag.ReturnDate = date;
+            return View("SelectConsultant", allConsultants);
+        }
+        
+        // Not authorized
+        if (actualConsultantId == null)
         {
             return RedirectToAction("AccessDenied", "Account");
         }
 
-        var consultant = await _consultantService.GetConsultantByIdAsync(consultantId.Value);
+        var consultant = await _consultantService.GetConsultantByIdAsync(actualConsultantId.Value);
         var scheduleDate = date ?? DateTime.Today;
         
         var appointments = await _appointmentService.GetConsultantAppointmentsByDateRangeAsync(
-            consultantId.Value, scheduleDate, scheduleDate.AddDays(1));
+            actualConsultantId.Value, scheduleDate, scheduleDate.AddDays(1));
         var appointmentList = appointments.ToList();
         
         var timeSlots = GenerateTimeSlots(appointmentList);
@@ -159,6 +232,10 @@ public class ConsultantPortalController : Controller
         };
         
         ViewBag.SelectedDate = scheduleDate;
+        // Store for navigation and admin banner
+        ViewBag.SelectedConsultantId = actualConsultantId.Value;
+        ViewBag.IsAdmin = User.IsInRole("Admin");
+        
         return View(viewModel);
     }
 
@@ -167,25 +244,25 @@ public class ConsultantPortalController : Controller
     /// </summary>
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> UpdateStatus(int id, AppointmentStatus status)
+    public async Task<IActionResult> UpdateStatus(int id, AppointmentStatus status, int? consultantId = null)
     {
-        var consultantId = await GetCurrentConsultantIdAsync();
-        if (consultantId == null)
+        var actualConsultantId = await GetCurrentConsultantIdAsync(consultantId);
+        if (actualConsultantId == null)
         {
             return RedirectToAction("AccessDenied", "Account");
         }
 
-        // Verify the consultant owns this appointment
+        // Verify the appointment belongs to the consultant being viewed
         var appointment = await _appointmentService.GetAppointmentByIdAsync(id);
         if (appointment == null)
         {
             return NotFound();
         }
 
-        if (appointment.Consultant?.Id != consultantId)
+        if (appointment.Consultant?.Id != actualConsultantId)
         {
-            _logger.LogWarning("Consultant {ConsultantId} attempted to update appointment {AppointmentId} belonging to another consultant", 
-                consultantId, id);
+            _logger.LogWarning("User attempted to update appointment {AppointmentId} belonging to consultant {AppointmentConsultantId} while viewing consultant {ViewingConsultantId}", 
+                id, appointment.Consultant?.Id, actualConsultantId);
             return Forbid();
         }
 
@@ -193,12 +270,12 @@ public class ConsultantPortalController : Controller
         if (status != AppointmentStatus.Completed && status != AppointmentStatus.Confirmed)
         {
             TempData["ErrorMessage"] = "Invalid status update.";
-            return RedirectToAction(nameof(Dashboard));
+            return RedirectToAction(nameof(Dashboard), new { consultantId });
         }
 
         await _appointmentService.UpdateAppointmentStatusAsync(id, status);
         TempData["SuccessMessage"] = $"Appointment marked as {status}.";
-        return RedirectToAction(nameof(Dashboard));
+        return RedirectToAction(nameof(Dashboard), new { consultantId });
     }
 
     /// <summary>
@@ -229,13 +306,25 @@ public class ConsultantPortalController : Controller
     }
 
     /// <summary>
-    /// Get the current consultant's ID from user claims
+    /// Get the current consultant's ID from user claims or use selected consultant for admins
     /// </summary>
-    private async Task<int?> GetCurrentConsultantIdAsync()
+    /// <param name="selectedConsultantId">Optional consultant ID selected by admin</param>
+    private async Task<int?> GetCurrentConsultantIdAsync(int? selectedConsultantId = null)
     {
-        // For admin users, they might be viewing as a specific consultant
-        // For regular consultant users, get their linked consultant ID
+        // For admin users with a selected consultant, validate and return that ID
+        if (User.IsInRole("Admin") && selectedConsultantId.HasValue)
+        {
+            // Validate the consultant exists
+            var selectedConsultant = await _consultantService.GetConsultantByIdAsync(selectedConsultantId.Value);
+            if (selectedConsultant != null)
+            {
+                return selectedConsultantId.Value;
+            }
+            // Invalid consultant ID, return null to trigger selection page
+            return null;
+        }
         
+        // For regular consultant users, get their linked consultant ID
         var userIdClaim = User.FindFirst("UserId")?.Value ?? User.FindFirst("sub")?.Value;
         if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out var userId))
         {
