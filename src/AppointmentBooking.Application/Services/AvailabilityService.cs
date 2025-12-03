@@ -35,6 +35,11 @@ public class AvailabilityService : IAvailabilityService
         if (hours == null || hours.IsClosed)
             return Enumerable.Empty<AvailableSlotDto>();
 
+        // Get all consultants for this branch
+        var consultants = await _unitOfWork.Consultants.FindAsync(c => c.BranchId == branchId && c.IsActive);
+        var consultantList = consultants.ToList();
+        var totalConsultants = consultantList.Count;
+
         // Generate time slots based on operating hours
         var slots = new List<AvailableSlotDto>();
         var slotDuration = TimeSpan.FromMinutes(service.DurationMinutes);
@@ -44,14 +49,17 @@ public class AvailabilityService : IAvailabilityService
         while (currentTime.Add(slotDuration) <= hours.CloseTime)
         {
             var endTime = currentTime.Add(slotDuration);
-            var isAvailable = await IsSlotAvailableAsync(branchId, date, currentTime, endTime);
+            var availableCount = await GetAvailableConsultantCountAsync(branchId, date, currentTime, endTime, consultantList);
+            var isAvailable = availableCount > 0 && IsSlotInFuture(date, currentTime);
 
             slots.Add(new AvailableSlotDto
             {
                 Date = date,
                 StartTime = currentTime,
                 EndTime = endTime,
-                IsAvailable = isAvailable
+                IsAvailable = isAvailable,
+                AvailableConsultantCount = isAvailable ? availableCount : 0,
+                TotalConsultantCount = totalConsultants
             });
 
             currentTime = currentTime.Add(TimeSpan.FromMinutes(30));
@@ -85,22 +93,69 @@ public class AvailabilityService : IAvailabilityService
     }
 
     /// <summary>
-    /// Check if a specific time slot is available (no conflicts, minimum lead time)
+    /// Check if a specific time slot is available (at least one consultant available, minimum lead time)
     /// </summary>
     public async Task<bool> IsSlotAvailableAsync(int branchId, DateTime date, TimeSpan startTime, TimeSpan endTime)
     {
         // Check minimum lead time (1 hour in advance)
-        var slotDateTime = date.Add(startTime);
-        if (slotDateTime <= DateTime.Now.AddHours(1))
+        if (!IsSlotInFuture(date, startTime))
             return false;
 
-        // Check for conflicting appointments
-        var appointments = await _unitOfWork.Appointments.FindAsync(a =>
-            a.BranchId == branchId &&
-            a.AppointmentDate == date &&
-            a.Status != AppointmentStatus.Cancelled &&
-            (a.StartTime < endTime && a.EndTime > startTime)); // Overlapping time check
+        // Get consultants for this branch
+        var consultants = await _unitOfWork.Consultants.FindAsync(c => c.BranchId == branchId && c.IsActive);
+        var consultantList = consultants.ToList();
 
-        return !appointments.Any();
+        // Check if at least one consultant is available
+        var availableCount = await GetAvailableConsultantCountAsync(branchId, date, startTime, endTime, consultantList);
+        return availableCount > 0;
+    }
+
+    /// <summary>
+    /// Check if the slot is at least 1 hour in the future
+    /// </summary>
+    private static bool IsSlotInFuture(DateTime date, TimeSpan startTime)
+    {
+        var slotDateTime = date.Add(startTime);
+        return slotDateTime > DateTime.Now.AddHours(1);
+    }
+
+    /// <summary>
+    /// Count how many consultants are available for a given time slot
+    /// </summary>
+    private async Task<int> GetAvailableConsultantCountAsync(
+        int branchId, 
+        DateTime date, 
+        TimeSpan startTime, 
+        TimeSpan endTime,
+        IList<Core.Entities.Consultant> consultants)
+    {
+        var availableCount = 0;
+
+        foreach (var consultant in consultants)
+        {
+            // Check for overlapping appointments for this consultant
+            var candidateAppointments = await _unitOfWork.Appointments.FindAsync(a =>
+                a.ConsultantId == consultant.Id &&
+                a.AppointmentDate == date &&
+                a.Status != AppointmentStatus.Cancelled &&
+                a.StartTime < endTime);
+
+            // Filter in memory for full overlap check
+            var overlappingAppointments = candidateAppointments.Where(a =>
+            {
+                var effectiveEndTime = a.EndTime != TimeSpan.Zero
+                    ? a.EndTime
+                    : a.StartTime.Add(TimeSpan.FromMinutes(15)); // Default 15-min fallback
+
+                return startTime < effectiveEndTime;
+            }).ToList();
+
+            if (!overlappingAppointments.Any())
+            {
+                availableCount++;
+            }
+        }
+
+        return availableCount;
     }
 }
