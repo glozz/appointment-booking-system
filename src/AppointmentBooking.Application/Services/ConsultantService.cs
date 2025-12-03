@@ -1,4 +1,5 @@
 using AutoMapper;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using AppointmentBooking.Application.DTOs;
 using AppointmentBooking.Application.Interfaces;
@@ -36,7 +37,7 @@ public class ConsultantService : IConsultantService
     {
         _logger.LogDebug("Retrieving consultant with ID: {ConsultantId}", id);
 
-        var consultant = await _unitOfWork.Consultants.GetByIdAsync(id);
+        var consultant = await _unitOfWork.Consultants.GetByIdWithIncludesAsync(id, c => c.Branch);
         
         if (consultant == null)
         {
@@ -52,8 +53,9 @@ public class ConsultantService : IConsultantService
     {
         _logger.LogDebug("Retrieving consultant for user ID: {UserId}", userId);
 
-        var consultants = await _unitOfWork.Consultants.FindAsync(c => c.UserId == userId);
-        var consultant = consultants.FirstOrDefault();
+        var consultant = await _unitOfWork.Consultants.Query()
+            .Include(c => c.Branch)
+            .FirstOrDefaultAsync(c => c.UserId == userId);
         
         if (consultant == null)
         {
@@ -69,7 +71,9 @@ public class ConsultantService : IConsultantService
     {
         _logger.LogDebug("Retrieving all consultants");
 
-        var consultants = await _unitOfWork.Consultants.GetAllAsync();
+        var consultants = await _unitOfWork.Consultants.Query()
+            .Include(c => c.Branch)
+            .ToListAsync();
         return _mapper.Map<IEnumerable<ConsultantDto>>(consultants);
     }
 
@@ -78,7 +82,10 @@ public class ConsultantService : IConsultantService
     {
         _logger.LogDebug("Retrieving consultants for branch: {BranchId}", branchId);
 
-        var consultants = await _unitOfWork.Consultants.FindAsync(c => c.BranchId == branchId && c.IsActive);
+        var consultants = await _unitOfWork.Consultants.Query()
+            .Include(c => c.Branch)
+            .Where(c => c.BranchId == branchId && c.IsActive)
+            .ToListAsync();
         return _mapper.Map<IEnumerable<ConsultantDto>>(consultants);
     }
 
