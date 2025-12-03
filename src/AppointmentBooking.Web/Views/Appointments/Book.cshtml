@@ -219,9 +219,11 @@
         color: var(--bs-primary);
         font-weight: 600;
     }
+    /* Date and time slot buttons */
     .date-btn, .time-slot-btn {
         min-width: 100px;
         transition: all 0.2s;
+        position: relative;
     }
     .date-btn:hover:not(:disabled), .time-slot-btn:hover:not(:disabled) {
         transform: translateY(-2px);
@@ -232,17 +234,131 @@
         border-color: var(--bs-primary);
         color: white;
     }
+    .date-btn.selected .availability-indicator,
+    .time-slot-btn.selected .availability-badge {
+        color: rgba(255,255,255,0.9) !important;
+    }
+    
+    /* Availability indicator dot on date buttons */
+    .availability-indicator {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-left: 6px;
+        vertical-align: middle;
+    }
+    .availability-high { background-color: #198754; } /* green */
+    .availability-medium { background-color: #ffc107; } /* yellow */
+    .availability-low { background-color: #fd7e14; } /* orange */
+    
+    /* Time slot availability styling */
     .time-slot-btn .availability-badge {
         font-size: 0.7rem;
         display: block;
         margin-top: 4px;
     }
-    .time-slot-btn.last-slot {
-        border-color: #fd7e14;
+    .time-slot-btn.availability-green {
+        border-color: #198754;
+        background-color: rgba(25, 135, 84, 0.1);
     }
-    .time-slot-btn.last-slot .availability-badge {
+    .time-slot-btn.availability-green:hover {
+        background-color: rgba(25, 135, 84, 0.2);
+    }
+    .time-slot-btn.availability-green .availability-badge {
+        color: #198754;
+    }
+    .time-slot-btn.availability-yellow {
+        border-color: #ffc107;
+        background-color: rgba(255, 193, 7, 0.1);
+    }
+    .time-slot-btn.availability-yellow:hover {
+        background-color: rgba(255, 193, 7, 0.2);
+    }
+    .time-slot-btn.availability-yellow .availability-badge {
+        color: #b38600;
+    }
+    .time-slot-btn.availability-red {
+        border-color: #fd7e14;
+        background-color: rgba(253, 126, 20, 0.1);
+    }
+    .time-slot-btn.availability-red:hover {
+        background-color: rgba(253, 126, 20, 0.2);
+    }
+    .time-slot-btn.availability-red .availability-badge {
         color: #fd7e14;
         font-weight: bold;
+    }
+    
+    /* Last slot warning badge */
+    .last-slot-warning {
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        background-color: #dc3545;
+        color: white;
+        font-size: 0.6rem;
+        padding: 2px 6px;
+        border-radius: 10px;
+        font-weight: bold;
+        animation: pulse 2s infinite;
+    }
+    @@keyframes pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.1); }
+    }
+    
+    /* Availability legend */
+    .availability-legend {
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        margin-bottom: 15px;
+        flex-wrap: wrap;
+    }
+    .legend-item {
+        display: flex;
+        align-items: center;
+        font-size: 0.8rem;
+        color: #6c757d;
+    }
+    .legend-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 6px;
+    }
+    .legend-dot.green { background-color: #198754; }
+    .legend-dot.yellow { background-color: #ffc107; }
+    .legend-dot.orange { background-color: #fd7e14; }
+    
+    /* Mobile responsive improvements */
+    @@media (max-width: 576px) {
+        .booking-progress {
+            padding: 10px 0;
+        }
+        .booking-progress .step-number {
+            width: 28px;
+            height: 28px;
+            font-size: 0.85rem;
+        }
+        .booking-progress .step-label {
+            font-size: 0.7rem;
+        }
+        .date-btn, .time-slot-btn {
+            min-width: 80px;
+            padding: 0.5rem !important;
+            font-size: 0.85rem;
+        }
+        .time-slot-btn .availability-badge {
+            font-size: 0.6rem;
+        }
+        .availability-legend {
+            gap: 10px;
+        }
+        .legend-item {
+            font-size: 0.7rem;
+        }
     }
 </style>
 
@@ -374,22 +490,46 @@
                         return;
                     }
 
-                    let html = '';
+                    // Add availability legend
+                    let html = `
+                        <div class="col-12 mb-3">
+                            <div class="availability-legend">
+                                <div class="legend-item"><span class="legend-dot green"></span> High availability</div>
+                                <div class="legend-item"><span class="legend-dot yellow"></span> Limited availability</div>
+                                <div class="legend-item"><span class="legend-dot orange"></span> Last slot!</div>
+                            </div>
+                        </div>
+                    `;
+                    
                     availableSlots.forEach(slot => {
                         const startTime = formatTime(slot.startTime);
                         const endTime = formatTime(slot.endTime);
                         const availableCount = slot.availableConsultantCount;
                         const totalCount = slot.totalConsultantCount;
-                        const isLastSlot = availableCount === 1;
-                        const lastSlotClass = isLastSlot ? 'last-slot' : '';
-                        const availabilityText = isLastSlot 
-                            ? 'Last slot!' 
-                            : `${availableCount} of ${totalCount} available`;
+                        const availabilityPercent = (availableCount / totalCount) * 100;
+                        
+                        // Determine availability class based on percentage
+                        let availabilityClass = '';
+                        let lastSlotBadge = '';
+                        let availabilityText = '';
+                        
+                        if (availableCount === 1) {
+                            availabilityClass = 'availability-red';
+                            lastSlotBadge = '<span class="last-slot-warning">LAST!</span>';
+                            availabilityText = 'Last slot!';
+                        } else if (availabilityPercent <= 50) {
+                            availabilityClass = 'availability-yellow';
+                            availabilityText = `${availableCount} of ${totalCount} available`;
+                        } else {
+                            availabilityClass = 'availability-green';
+                            availabilityText = `${availableCount} of ${totalCount} available`;
+                        }
                         
                         html += `
                             <div class="col-6 col-md-4 col-lg-3">
-                                <button type="button" class="btn btn-outline-primary time-slot-btn w-100 py-3 ${lastSlotClass}" 
+                                <button type="button" class="btn btn-outline-secondary time-slot-btn w-100 py-3 ${availabilityClass}" 
                                         data-start="${slot.startTime}" data-end="${slot.endTime}">
+                                    ${lastSlotBadge}
                                     <strong>${startTime}</strong>
                                     <span class="availability-badge">${availabilityText}</span>
                                 </button>

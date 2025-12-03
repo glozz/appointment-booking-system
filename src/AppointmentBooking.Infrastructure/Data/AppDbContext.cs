@@ -100,11 +100,18 @@ public class AppDbContext : DbContext
             .HasForeignKey(n => n.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Appointment unique index on (BranchId, AppointmentDate, StartTime) for double-booking prevention
+        // Appointment unique index on (ConsultantId, AppointmentDate, StartTime) for per-consultant double-booking prevention
+        // This allows multiple customers to book the same time slot at a branch (with different consultants)
+        // while preventing the same consultant from being double-booked
         modelBuilder.Entity<Appointment>()
-            .HasIndex(a => new { a.BranchId, a.AppointmentDate, a.StartTime })
+            .HasIndex(a => new { a.ConsultantId, a.AppointmentDate, a.StartTime })
             .IsUnique()
-            .HasDatabaseName("IX_Appointments_BranchId_AppointmentDate_StartTime");
+            .HasDatabaseName("IX_Appointments_ConsultantId_AppointmentDate_StartTime");
+
+        // Non-unique index on (BranchId, AppointmentDate) for efficient slot availability queries
+        modelBuilder.Entity<Appointment>()
+            .HasIndex(a => new { a.BranchId, a.AppointmentDate })
+            .HasDatabaseName("IX_Appointments_BranchId_AppointmentDate");
 
         // Consultant configuration
         modelBuilder.Entity<Consultant>()
