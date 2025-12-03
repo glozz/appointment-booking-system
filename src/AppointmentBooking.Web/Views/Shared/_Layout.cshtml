@@ -29,7 +29,32 @@
                     </li>
                     @if (User.Identity?.IsAuthenticated == true)
                     {
-                        @if (User.IsInRole("Consultant") || User.IsInRole("Admin"))
+                        @if (User.IsInRole("Admin"))
+                        {
+                            var consultantId = ViewBag.SelectedConsultantId as int?;
+                            <!-- Admin Menu -->
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="ConsultantPortal" asp-action="Dashboard" asp-route-consultantId="@consultantId">
+                                    <i class="bi bi-calendar2-week"></i> My Schedule
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="ConsultantPortal" asp-action="TodaySchedule" asp-route-consultantId="@consultantId">
+                                    <i class="bi bi-calendar-day"></i> Today
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="ConsultantPortal" asp-action="Upcoming" asp-route-consultantId="@consultantId">
+                                    <i class="bi bi-calendar-plus"></i> Upcoming
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="AdminConsultants" asp-action="Pending">
+                                    <i class="bi bi-person-badge"></i> Pending Consultants
+                                </a>
+                            </li>
+                        }
+                        else if (User.IsInRole("Consultant"))
                         {
                             var consultantId = ViewBag.SelectedConsultantId as int?;
                             <!-- Consultant Menu -->
@@ -88,6 +113,11 @@
                     }
                     else
                     {
+                        <li class="nav-item">
+                            <a class="nav-link" asp-controller="ConsultantRegistration" asp-action="Register">
+                                <i class="bi bi-person-badge"></i> Become a Consultant
+                            </a>
+                        </li>
                         <li class="nav-item">
                             <a class="nav-link" asp-controller="Account" asp-action="Login">
                                 <i class="bi bi-box-arrow-in-right"></i> Login
