@@ -256,15 +256,26 @@ The appointment booking system enforces the following rules:
 - All appointments must be scheduled on **15-minute increments** (e.g., 09:00, 09:15, 09:30, 09:45)
 - Appointment duration is determined by the selected service
 
-### Double-Booking Prevention
-- A unique index on `(BranchId, AppointmentDate, StartTime)` prevents duplicate bookings at the same time slot
-- Server-side validation rejects bookings for already-occupied slots
+### Multi-Consultant Booking
+- Multiple customers can book the same time slot at a branch (up to the number of available consultants)
+- A unique index on `(ConsultantId, AppointmentDate, StartTime)` prevents a single consultant from being double-booked
+- Server-side validation checks consultant availability before accepting a booking
 
 ### Consultant Auto-Assignment
 - When creating an appointment, a consultant is automatically assigned from the selected branch
 - A consultant is considered available if they have no overlapping appointments in the requested time window
 - Overlap detection uses robust logic: `existing.Start < requestedEnd && requestedStart < existing.End`
 - If no consultants are available, the booking is rejected with an appropriate error message
+
+### Real-Time Availability Wizard
+The booking wizard provides real-time feedback on appointment availability:
+- **Step-by-step wizard** guides users through selecting branch, date, and time
+- **Color-coded availability indicators** show slot status:
+  - 🟢 **Green** - High availability (more than 50% of consultants available)
+  - 🟡 **Yellow** - Limited availability (50% or fewer consultants available)
+  - 🟠 **Orange/Red** - Last slot! (only 1 consultant available)
+- **Mobile-responsive design** adapts to all screen sizes
+- Slots are only shown if at least one consultant is available
 
 ### Customer Details
 - Customer information (First Name, Last Name, Email, Phone) is pre-populated from the logged-in user's account
