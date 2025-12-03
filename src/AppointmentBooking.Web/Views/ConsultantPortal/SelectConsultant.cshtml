@@ -3,8 +3,9 @@
     ViewData["Title"] = "Select Consultant";
     var returnAction = ViewBag.ReturnAction as string ?? "Dashboard";
     var returnDate = ViewBag.ReturnDate as DateTime?;
-    var activeConsultants = Model.Where(c => c.IsActive).ToList();
-    var inactiveConsultants = Model.Where(c => !c.IsActive).ToList();
+    var consultantsByBranch = Model.GroupBy(c => new { c.BranchId, c.BranchName })
+                                   .OrderBy(g => g.Key.BranchName)
+                                   .ToList();
 }
 
 <div class="container my-5">
@@ -27,102 +28,134 @@
             
             @if (Model.Any())
             {
-                <div class="row">
-                    @foreach (var consultant in activeConsultants)
-                    {
-                        <div class="col-md-4 mb-4">
-                            <div class="card h-100 consultant-card">
-                                <div class="card-body">
-                                    <div class="d-flex align-items-center mb-3">
-                                        <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" 
-                                             style="width: 50px; height: 50px; font-size: 1.25rem;">
-                                            @(consultant.FirstName.Substring(0, 1))@(consultant.LastName.Substring(0, 1))
-                                        </div>
-                                        <div class="ms-3">
-                                            <h5 class="card-title mb-0">@consultant.FullName</h5>
-                                            <small class="text-muted">
-                                                <i class="bi bi-building"></i> Branch #@consultant.BranchId
-                                            </small>
-                                        </div>
-                                    </div>
-                                    <p class="card-text text-muted small">
-                                        <i class="bi bi-person-badge"></i> Consultant ID: @consultant.Id
-                                    </p>
+                <!-- Search and Filters -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <div class="row g-3 align-items-center">
+                            <div class="col-md-4">
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                    <input type="text" id="searchInput" class="form-control" placeholder="Search consultants...">
+                                    <button type="button" class="btn btn-outline-secondary" id="clearSearch" style="display: none;">
+                                        <i class="bi bi-x"></i>
+                                    </button>
                                 </div>
-                                <div class="card-footer bg-transparent border-0 pb-3">
-                                    @if (returnAction == "Schedule" && returnDate.HasValue)
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="activeOnlyToggle" checked>
+                                    <label class="form-check-label" for="activeOnlyToggle">Show active only</label>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <select id="branchFilter" class="form-select">
+                                    <option value="">All Branches</option>
+                                    @foreach (var branch in consultantsByBranch)
                                     {
-                                        <a asp-action="@returnAction" 
-                                           asp-route-consultantId="@consultant.Id"
-                                           asp-route-date="@returnDate.Value.ToString("yyyy-MM-dd")"
-                                           class="btn btn-primary w-100">
-                                            <i class="bi bi-calendar-check"></i> View Schedule
-                                        </a>
+                                        <option value="@branch.Key.BranchName">@(string.IsNullOrEmpty(branch.Key.BranchName) ? $"Branch #{branch.Key.BranchId}" : branch.Key.BranchName)</option>
                                     }
-                                    else
-                                    {
-                                        <a asp-action="@returnAction" 
-                                           asp-route-consultantId="@consultant.Id"
-                                           class="btn btn-primary w-100">
-                                            <i class="bi bi-calendar-check"></i> View Schedule
-                                        </a>
-                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-2 text-end">
+                                <span id="resultCounter" class="text-muted small"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Expand/Collapse All Buttons -->
+                <div class="d-flex justify-content-end mb-3 gap-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="expandAll">
+                        <i class="bi bi-arrows-expand"></i> Expand All
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="collapseAll">
+                        <i class="bi bi-arrows-collapse"></i> Collapse All
+                    </button>
+                </div>
+
+                <!-- Branch Accordion -->
+                <div class="accordion" id="branchAccordion">
+                    @{
+                        var branchIndex = 0;
+                    }
+                    @foreach (var branch in consultantsByBranch)
+                    {
+                        var branchDisplayName = string.IsNullOrEmpty(branch.Key.BranchName) ? $"Branch #{branch.Key.BranchId}" : branch.Key.BranchName;
+                        var activeCount = branch.Count(c => c.IsActive);
+                        var totalCount = branch.Count();
+                        <div class="accordion-item branch-group" data-branch="@branch.Key.BranchName">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button @(branchIndex > 0 ? "collapsed" : "")" type="button" data-bs-toggle="collapse" data-bs-target="#branch-@branch.Key.BranchId" aria-expanded="@(branchIndex == 0 ? "true" : "false")">
+                                    <i class="bi bi-building me-2"></i>
+                                    <strong>@branchDisplayName</strong>
+                                    <span class="badge bg-primary ms-2 branch-count">@activeCount consultants</span>
+                                </button>
+                            </h2>
+                            <div id="branch-@branch.Key.BranchId" class="accordion-collapse collapse @(branchIndex == 0 ? "show" : "")" data-bs-parent="#branchAccordion">
+                                <div class="accordion-body">
+                                    <div class="row">
+                                        @foreach (var consultant in branch.OrderBy(c => c.LastName).ThenBy(c => c.FirstName))
+                                        {
+                                            var isActive = consultant.IsActive;
+                                            <div class="col-md-4 mb-4 consultant-card-wrapper" 
+                                                 data-name="@consultant.FullName.ToLower()" 
+                                                 data-branch="@branch.Key.BranchName.ToLower()"
+                                                 data-active="@isActive.ToString().ToLower()">
+                                                <div class="card h-100 consultant-card @(isActive ? "" : "opacity-50")" style="border-left: 4px solid @(isActive ? "#198754" : "#6c757d");">
+                                                    <div class="card-body">
+                                                        <div class="d-flex align-items-center mb-3">
+                                                            <div class="rounded-circle text-white d-flex align-items-center justify-content-center" 
+                                                                 style="width: 50px; height: 50px; font-size: 1.25rem; background: linear-gradient(135deg, @(isActive ? "#667eea" : "#6c757d") 0%, @(isActive ? "#764ba2" : "#495057") 100%);">
+                                                                @(consultant.FirstName.Substring(0, 1))@(consultant.LastName.Substring(0, 1))
+                                                            </div>
+                                                            <div class="ms-3">
+                                                                <h5 class="card-title mb-0">@consultant.FullName</h5>
+                                                                <span class="badge @(isActive ? "bg-success" : "bg-secondary") mt-1">
+                                                                    @(isActive ? "Active" : "Inactive")
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        <p class="card-text text-muted small mb-1">
+                                                            <i class="bi bi-building"></i> @branchDisplayName
+                                                        </p>
+                                                        <p class="card-text text-muted small">
+                                                            <i class="bi bi-person-badge"></i> Consultant ID: @consultant.Id
+                                                        </p>
+                                                    </div>
+                                                    <div class="card-footer bg-transparent border-0 pb-3">
+                                                        @if (returnAction == "Schedule" && returnDate.HasValue)
+                                                        {
+                                                            <a asp-action="@returnAction" 
+                                                               asp-route-consultantId="@consultant.Id"
+                                                               asp-route-date="@returnDate.Value.ToString("yyyy-MM-dd")"
+                                                               class="btn @(isActive ? "btn-primary" : "btn-outline-secondary") w-100">
+                                                                <i class="bi bi-calendar-check"></i> View Schedule
+                                                            </a>
+                                                        }
+                                                        else
+                                                        {
+                                                            <a asp-action="@returnAction" 
+                                                               asp-route-consultantId="@consultant.Id"
+                                                               class="btn @(isActive ? "btn-primary" : "btn-outline-secondary") w-100">
+                                                                <i class="bi bi-calendar-check"></i> View Schedule
+                                                            </a>
+                                                        }
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
                                 </div>
                             </div>
                         </div>
+                        branchIndex++;
                     }
                 </div>
-                
-                @if (inactiveConsultants.Any())
-                {
-                    <hr class="my-4" />
-                    <h5 class="text-muted mb-3">
-                        <i class="bi bi-person-x"></i> Inactive Consultants (@inactiveConsultants.Count)
-                    </h5>
-                    <div class="row">
-                        @foreach (var consultant in inactiveConsultants)
-                        {
-                            <div class="col-md-4 mb-4">
-                                <div class="card h-100 opacity-50">
-                                    <div class="card-body">
-                                        <div class="d-flex align-items-center mb-3">
-                                            <div class="rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center" 
-                                                 style="width: 50px; height: 50px; font-size: 1.25rem;">
-                                                @(consultant.FirstName.Substring(0, 1))@(consultant.LastName.Substring(0, 1))
-                                            </div>
-                                            <div class="ms-3">
-                                                <h5 class="card-title mb-0">@consultant.FullName</h5>
-                                                <small class="text-muted">
-                                                    <i class="bi bi-building"></i> Branch #@consultant.BranchId
-                                                </small>
-                                            </div>
-                                        </div>
-                                        <span class="badge bg-secondary">Inactive</span>
-                                    </div>
-                                    <div class="card-footer bg-transparent border-0 pb-3">
-                                        @if (returnAction == "Schedule" && returnDate.HasValue)
-                                        {
-                                            <a asp-action="@returnAction" 
-                                               asp-route-consultantId="@consultant.Id"
-                                               asp-route-date="@returnDate.Value.ToString("yyyy-MM-dd")"
-                                               class="btn btn-outline-secondary w-100">
-                                                <i class="bi bi-calendar-check"></i> View Schedule
-                                            </a>
-                                        }
-                                        else
-                                        {
-                                            <a asp-action="@returnAction" 
-                                               asp-route-consultantId="@consultant.Id"
-                                               class="btn btn-outline-secondary w-100">
-                                                <i class="bi bi-calendar-check"></i> View Schedule
-                                            </a>
-                                        }
-                                    </div>
-                                </div>
-                            </div>
-                        }
-                    </div>
-                }
+
+                <!-- No Results Message -->
+                <div id="noResultsMessage" class="alert alert-warning text-center" style="display: none;">
+                    <i class="bi bi-search"></i> No consultants match your search criteria.
+                </div>
             }
             else
             {
@@ -146,4 +179,104 @@
         transform: translateY(-5px);
         box-shadow: 0 8px 25px rgba(0,0,0,0.15);
     }
+    .accordion-button:not(.collapsed) {
+        background-color: #e7f1ff;
+    }
 </style>
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchInput = document.getElementById('searchInput');
+            const clearSearch = document.getElementById('clearSearch');
+            const activeOnlyToggle = document.getElementById('activeOnlyToggle');
+            const branchFilter = document.getElementById('branchFilter');
+            const resultCounter = document.getElementById('resultCounter');
+            const noResultsMessage = document.getElementById('noResultsMessage');
+            const expandAllBtn = document.getElementById('expandAll');
+            const collapseAllBtn = document.getElementById('collapseAll');
+
+            function filterConsultants() {
+                const searchTerm = searchInput.value.toLowerCase();
+                const activeOnly = activeOnlyToggle.checked;
+                const selectedBranch = branchFilter.value.toLowerCase();
+                
+                let visibleCount = 0;
+                let totalCount = 0;
+                
+                document.querySelectorAll('.consultant-card-wrapper').forEach(function(card) {
+                    const name = card.dataset.name;
+                    const branch = card.dataset.branch;
+                    const isActive = card.dataset.active === 'true';
+                    
+                    totalCount++;
+                    
+                    const matchesSearch = name.includes(searchTerm) || branch.includes(searchTerm);
+                    const matchesActive = !activeOnly || isActive;
+                    const matchesBranch = !selectedBranch || branch === selectedBranch;
+                    
+                    if (matchesSearch && matchesActive && matchesBranch) {
+                        card.style.display = '';
+                        visibleCount++;
+                    } else {
+                        card.style.display = 'none';
+                    }
+                });
+                
+                // Update branch visibility and counts
+                document.querySelectorAll('.branch-group').forEach(function(branchGroup) {
+                    const visibleCards = branchGroup.querySelectorAll('.consultant-card-wrapper:not([style*="display: none"])');
+                    const countBadge = branchGroup.querySelector('.branch-count');
+                    
+                    if (visibleCards.length === 0) {
+                        branchGroup.style.display = 'none';
+                    } else {
+                        branchGroup.style.display = '';
+                        countBadge.textContent = visibleCards.length + ' consultant' + (visibleCards.length !== 1 ? 's' : '');
+                    }
+                });
+                
+                resultCounter.textContent = 'Showing ' + visibleCount + ' of ' + totalCount + ' consultants';
+                noResultsMessage.style.display = visibleCount === 0 ? 'block' : 'none';
+                clearSearch.style.display = searchTerm ? 'block' : 'none';
+            }
+
+            searchInput.addEventListener('input', filterConsultants);
+            activeOnlyToggle.addEventListener('change', filterConsultants);
+            branchFilter.addEventListener('change', filterConsultants);
+            
+            clearSearch.addEventListener('click', function() {
+                searchInput.value = '';
+                filterConsultants();
+                searchInput.focus();
+            });
+
+            expandAllBtn.addEventListener('click', function() {
+                document.querySelectorAll('.accordion-collapse').forEach(function(collapse) {
+                    new bootstrap.Collapse(collapse, { toggle: false }).show();
+                });
+            });
+
+            collapseAllBtn.addEventListener('click', function() {
+                document.querySelectorAll('.accordion-collapse').forEach(function(collapse) {
+                    new bootstrap.Collapse(collapse, { toggle: false }).hide();
+                });
+            });
+
+            // Keyboard shortcuts
+            document.addEventListener('keydown', function(e) {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+                    e.preventDefault();
+                    searchInput.focus();
+                }
+                if (e.key === 'Escape' && document.activeElement === searchInput && searchInput.value) {
+                    searchInput.value = '';
+                    filterConsultants();
+                }
+            });
+
+            // Initial filter
+            filterConsultants();
+        });
+    </script>
+}

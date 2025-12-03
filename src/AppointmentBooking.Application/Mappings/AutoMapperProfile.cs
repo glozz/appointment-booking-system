@@ -30,7 +30,9 @@ public class AutoMapperProfile : Profile
         CreateMap<CustomerDto, Customer>();
 
         // Consultant mappings
-        CreateMap<Consultant, ConsultantDto>();
+        CreateMap<Consultant, ConsultantDto>()
+            .ForMember(dest => dest.BranchName, 
+                opt => opt.MapFrom(src => src.Branch != null ? src.Branch.Name : string.Empty));
         CreateMap<ConsultantDto, Consultant>();
     }
 }
