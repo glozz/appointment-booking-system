@@ -4,8 +4,12 @@
     var returnAction = ViewBag.ReturnAction as string ?? "Dashboard";
     var returnDate = ViewBag.ReturnDate as DateTime?;
     var consultantsByBranch = Model.GroupBy(c => new { c.BranchId, c.BranchName })
-                                   .OrderBy(g => g.Key.BranchName)
+                                   .OrderBy(g => g.Key.BranchName ?? string.Empty)
                                    .ToList();
+    
+    // Helper function to get display name for a branch
+    string GetBranchDisplayName(int branchId, string? branchName) => 
+        string.IsNullOrEmpty(branchName) ? $"Branch #{branchId}" : branchName;
 }
 
 <div class="container my-5">
@@ -52,7 +56,7 @@
                                     <option value="">All Branches</option>
                                     @foreach (var branch in consultantsByBranch)
                                     {
-                                        <option value="@branch.Key.BranchName">@(string.IsNullOrEmpty(branch.Key.BranchName) ? $"Branch #{branch.Key.BranchId}" : branch.Key.BranchName)</option>
+                                        <option value="@(branch.Key.BranchName ?? string.Empty)">@GetBranchDisplayName(branch.Key.BranchId, branch.Key.BranchName)</option>
                                     }
                                 </select>
                             </div>
@@ -80,10 +84,11 @@
                     }
                     @foreach (var branch in consultantsByBranch)
                     {
-                        var branchDisplayName = string.IsNullOrEmpty(branch.Key.BranchName) ? $"Branch #{branch.Key.BranchId}" : branch.Key.BranchName;
+                        var branchDisplayName = GetBranchDisplayName(branch.Key.BranchId, branch.Key.BranchName);
+                        var branchNameLower = (branch.Key.BranchName ?? string.Empty).ToLower();
                         var activeCount = branch.Count(c => c.IsActive);
                         var totalCount = branch.Count();
-                        <div class="accordion-item branch-group" data-branch="@branch.Key.BranchName">
+                        <div class="accordion-item branch-group" data-branch="@(branch.Key.BranchName ?? string.Empty)">
                             <h2 class="accordion-header">
                                 <button class="accordion-button @(branchIndex > 0 ? "collapsed" : "")" type="button" data-bs-toggle="collapse" data-bs-target="#branch-@branch.Key.BranchId" aria-expanded="@(branchIndex == 0 ? "true" : "false")">
                                     <i class="bi bi-building me-2"></i>
@@ -99,7 +104,7 @@
                                             var isActive = consultant.IsActive;
                                             <div class="col-md-4 mb-4 consultant-card-wrapper" 
                                                  data-name="@consultant.FullName.ToLower()" 
-                                                 data-branch="@branch.Key.BranchName.ToLower()"
+                                                 data-branch="@branchNameLower"
                                                  data-active="@isActive.ToString().ToLower()">
                                                 <div class="card h-100 consultant-card @(isActive ? "" : "opacity-50")" style="border-left: 4px solid @(isActive ? "#198754" : "#6c757d");">
                                                     <div class="card-body">
@@ -205,8 +210,8 @@
                 let totalCount = 0;
                 
                 document.querySelectorAll('.consultant-card-wrapper').forEach(function(card) {
-                    const name = card.dataset.name;
-                    const branch = card.dataset.branch;
+                    const name = card.dataset.name || '';
+                    const branch = card.dataset.branch || '';
                     const isActive = card.dataset.active === 'true';
                     
                     totalCount++;
