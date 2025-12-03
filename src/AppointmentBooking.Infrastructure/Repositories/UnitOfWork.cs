@@ -103,6 +103,12 @@ public class UnitOfWork : IUnitOfWork
             _currentTransaction = null;
         }
     }
+    
+    /// <inheritdoc />
+    public bool HasActiveTransaction()
+    {
+        return _currentTransaction != null;
+    }
 
     public void Dispose()
     {
