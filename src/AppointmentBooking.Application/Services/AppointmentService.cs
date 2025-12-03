@@ -146,8 +146,11 @@ public class AppointmentService : IAppointmentService
         }
         catch
         {
-            // Rollback transaction if any error occurs
-            await _unitOfWork.RollbackTransactionAsync();
+            // Only rollback if a transaction was actually started
+            if (_unitOfWork.HasActiveTransaction())
+            {
+                await _unitOfWork.RollbackTransactionAsync();
+            }
             throw;
         }
     }

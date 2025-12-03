@@ -36,4 +36,9 @@ public interface IUnitOfWork : IDisposable
     /// Rolls back the current database transaction.
     /// </summary>
     Task RollbackTransactionAsync();
+    
+    /// <summary>
+    /// Checks if there is an active database transaction.
+    /// </summary>
+    bool HasActiveTransaction();
 }
