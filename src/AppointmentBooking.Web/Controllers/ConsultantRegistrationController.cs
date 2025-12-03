@@ -64,7 +64,6 @@ public class ConsultantRegistrationController : Controller
             Password = model.Password,
             ConfirmPassword = model.ConfirmPassword,
             BranchId = model.BranchId,
-            Specialization = model.Specialization,
             Phone = model.Phone
         };
 

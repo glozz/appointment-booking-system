@@ -40,7 +40,6 @@ public class AdminConsultantsController : Controller
                 LastName = p.LastName,
                 Email = p.Email,
                 Phone = p.Phone,
-                Specialization = p.Specialization,
                 BranchId = p.BranchId,
                 BranchName = p.BranchName,
                 RegisteredAt = p.RegisteredAt

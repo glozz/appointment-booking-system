@@ -31,9 +31,6 @@ public class ConsultantRegistrationDto
     [Required]
     public int BranchId { get; set; }
     
-    [StringLength(100)]
-    public string? Specialization { get; set; }
-    
     [Phone]
     [StringLength(20)]
     public string? Phone { get; set; }
@@ -50,7 +47,6 @@ public class PendingConsultantDto
     public string LastName { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
     public string? Phone { get; set; }
-    public string? Specialization { get; set; }
     public int BranchId { get; set; }
     public string BranchName { get; set; } = string.Empty;
     public DateTime RegisteredAt { get; set; }

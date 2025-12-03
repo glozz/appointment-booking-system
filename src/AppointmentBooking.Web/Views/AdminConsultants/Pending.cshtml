@@ -53,10 +53,6 @@
                                         <tr>
                                             <td>
                                                 <strong>@consultant.FullName</strong>
-                                                @if (!string.IsNullOrEmpty(consultant.Specialization))
-                                                {
-                                                    <br /><small class="text-muted">@consultant.Specialization</small>
-                                                }
                                             </td>
                                             <td>@consultant.Email</td>
                                             <td>@(consultant.Phone ?? "-")</td>

@@ -35,10 +35,6 @@ public class ConsultantRegistrationViewModel
     [Display(Name = "Branch")]
     public int BranchId { get; set; }
 
-    [StringLength(100, ErrorMessage = "Specialization cannot exceed 100 characters")]
-    [Display(Name = "Specialization")]
-    public string? Specialization { get; set; }
-
     [Phone(ErrorMessage = "Invalid phone number")]
     [StringLength(20, ErrorMessage = "Phone number cannot exceed 20 characters")]
     [Display(Name = "Phone")]
