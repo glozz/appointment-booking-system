@@ -3,14 +3,30 @@
     ViewData["Title"] = "Upcoming Appointments";
     var groupedAppointments = Model.OrderBy(a => a.AppointmentDate).ThenBy(a => a.StartTime)
         .GroupBy(a => a.AppointmentDate.Date);
+    var isAdmin = ViewBag.IsAdmin as bool? ?? false;
+    var selectedConsultantId = ViewBag.SelectedConsultantId as int?;
+    var consultantName = ViewBag.ConsultantName as string ?? "Consultant";
 }
 
 <div class="container my-5">
     <div class="row">
         <div class="col-12">
+            @if (isAdmin)
+            {
+                <div class="alert alert-info d-flex justify-content-between align-items-center mb-4">
+                    <span>
+                        <i class="bi bi-shield-check"></i> 
+                        <strong>Admin View:</strong> Viewing @consultantName's schedule
+                    </span>
+                    <a asp-action="Dashboard" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-arrow-left-right"></i> Switch Consultant
+                    </a>
+                </div>
+            }
+            
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h1><i class="bi bi-calendar-plus text-primary"></i> Upcoming Appointments</h1>
-                <a asp-action="Dashboard" class="btn btn-outline-secondary">
+                <a asp-action="Dashboard" asp-route-consultantId="@selectedConsultantId" class="btn btn-outline-secondary">
                     <i class="bi bi-arrow-left"></i> Back to Dashboard
                 </a>
             </div>
