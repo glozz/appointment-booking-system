@@ -279,6 +279,39 @@ public class AuthServiceTests
     }
 
     [Fact]
+    public async Task LoginAsync_WithPendingConsultantAccount_ReturnsPendingApprovalMessage()
+    {
+        // Arrange
+        var loginDto = new LoginDto
+        {
+            Email = "consultant@example.com",
+            Password = "Password123!"
+        };
+
+        var user = new User
+        {
+            Id = 1,
+            Email = "consultant@example.com",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password123!", 12),
+            IsActive = false,
+            Role = UserRole.Consultant // This is a consultant account pending approval
+        };
+
+        var userRepoMock = new Mock<IRepository<User>>();
+        userRepoMock.Setup(r => r.FindAsync(It.IsAny<System.Linq.Expressions.Expression<Func<User, bool>>>()))
+            .ReturnsAsync(new[] { user });
+
+        _unitOfWorkMock.Setup(u => u.Users).Returns(userRepoMock.Object);
+
+        // Act
+        var result = await _authService.LoginAsync(loginDto);
+
+        // Assert
+        Assert.False(result.Success);
+        Assert.Contains("pending admin approval", result.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task VerifyEmailAsync_WithValidToken_ReturnsTrue()
     {
         // Arrange

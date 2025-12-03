@@ -1,0 +1,107 @@
+@model ConsultantRegistrationViewModel
+@{
+    ViewData["Title"] = "Become a Consultant";
+}
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0 text-center">
+                        <i class="bi bi-person-badge"></i> Become a Consultant
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-4">
+                        Register to become a consultant. Your application will be reviewed by an administrator 
+                        and you'll be notified once approved.
+                    </p>
+                    
+                    <form asp-action="Register" method="post">
+                        <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label asp-for="FirstName" class="form-label"></label>
+                                <input asp-for="FirstName" class="form-control" placeholder="First name" />
+                                <span asp-validation-for="FirstName" class="text-danger"></span>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label asp-for="LastName" class="form-label"></label>
+                                <input asp-for="LastName" class="form-control" placeholder="Last name" />
+                                <span asp-validation-for="LastName" class="text-danger"></span>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label asp-for="Email" class="form-label"></label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-envelope"></i></span>
+                                <input asp-for="Email" class="form-control" placeholder="Enter your email" />
+                            </div>
+                            <span asp-validation-for="Email" class="text-danger"></span>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label asp-for="BranchId" class="form-label"></label>
+                            <select asp-for="BranchId" asp-items="Model.Branches" class="form-select">
+                                <option value="">-- Select Branch --</option>
+                            </select>
+                            <span asp-validation-for="BranchId" class="text-danger"></span>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label asp-for="Phone" class="form-label"></label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-telephone"></i></span>
+                                <input asp-for="Phone" class="form-control" placeholder="Phone number (optional)" />
+                            </div>
+                            <span asp-validation-for="Phone" class="text-danger"></span>
+                        </div>
+                        
+                        <hr />
+                        
+                        <div class="mb-3">
+                            <label asp-for="Password" class="form-label"></label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-lock"></i></span>
+                                <input asp-for="Password" class="form-control" placeholder="Create a password" />
+                            </div>
+                            <span asp-validation-for="Password" class="text-danger"></span>
+                            <small class="text-muted">
+                                Must be at least 6 characters.
+                            </small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label asp-for="ConfirmPassword" class="form-label"></label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-lock-fill"></i></span>
+                                <input asp-for="ConfirmPassword" class="form-control" placeholder="Confirm your password" />
+                            </div>
+                            <span asp-validation-for="ConfirmPassword" class="text-danger"></span>
+                        </div>
+                        
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-success">
+                                <i class="bi bi-person-plus"></i> Submit Application
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                <div class="card-footer text-center">
+                    <p class="mb-0">
+                        Already have an account?
+                        <a asp-controller="Account" asp-action="Login">Login here</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

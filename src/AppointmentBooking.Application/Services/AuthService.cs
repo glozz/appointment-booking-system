@@ -140,6 +140,12 @@ public class AuthService : IAuthService
         // Check if account is active
         if (!user.IsActive)
         {
+            // Check if this is a consultant pending approval
+            if (user.Role == UserRole.Consultant)
+            {
+                _logger.LogWarning("Login failed - consultant account pending approval: {Email}", dto.Email);
+                return new AuthResponseDto { Success = false, Message = "Your account is pending admin approval. Please wait for activation." };
+            }
             _logger.LogWarning("Login failed - account deactivated: {Email}", dto.Email);
             return new AuthResponseDto { Success = false, Message = "Account has been deactivated." };
         }
