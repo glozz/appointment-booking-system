@@ -367,6 +367,179 @@ public class AppointmentServiceTests
     }
 
     [Fact]
+    public async Task CreateAppointmentAsync_NoAvailableConsultants_DoesNotAttemptRollbackOfNonExistentTransaction()
+    {
+        // Arrange - This test verifies the fix for the bug where RollbackTransactionAsync was called
+        // when no transaction was started (because exception was thrown before BeginTransactionAsync)
+        var dto = new CreateAppointmentDto
+        {
+            BranchId = 1,
+            ServiceId = 1,
+            AppointmentDate = DateTime.Today.AddDays(1),
+            StartTime = new TimeSpan(10, 0, 0),
+            Customer = new CustomerDto
+            {
+                FirstName = "John",
+                LastName = "Doe",
+                Email = "john@example.com",
+                Phone = "0123456789"
+            }
+        };
+
+        var service = new Service { Id = 1, DurationMinutes = 30 };
+        var serviceRepoMock = new Mock<IRepository<Service>>();
+        serviceRepoMock.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(service);
+        _unitOfWorkMock.Setup(u => u.Services).Returns(serviceRepoMock.Object);
+
+        var branchHoursRepoMock = new Mock<IRepository<BranchOperatingHours>>();
+        branchHoursRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<BranchOperatingHours, bool>>>()))
+            .ReturnsAsync(new[] { new BranchOperatingHours 
+            { 
+                BranchId = 1, 
+                DayOfWeek = dto.AppointmentDate.DayOfWeek,
+                OpenTime = new TimeSpan(8, 0, 0),
+                CloseTime = new TimeSpan(17, 0, 0),
+                IsClosed = false
+            }});
+        _unitOfWorkMock.Setup(u => u.BranchOperatingHours).Returns(branchHoursRepoMock.Object);
+
+        // Mock customer repository - new customer, no conflicts
+        var customerRepoMock = new Mock<IRepository<Customer>>();
+        customerRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<Customer, bool>>>()))
+            .ReturnsAsync(Enumerable.Empty<Customer>());
+        _unitOfWorkMock.Setup(u => u.Customers).Returns(customerRepoMock.Object);
+
+        // Mock appointment repository with overlapping appointment for the only consultant
+        var existingAppointment = new Appointment 
+        { 
+            Id = 1, 
+            ConsultantId = 1, 
+            BranchId = 1,
+            AppointmentDate = dto.AppointmentDate,
+            StartTime = new TimeSpan(9, 30, 0), 
+            EndTime = new TimeSpan(10, 30, 0),
+            Status = AppointmentStatus.Confirmed
+        };
+
+        var appointmentRepoMock = new Mock<IAppointmentRepository>();
+        appointmentRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<Appointment, bool>>>()))
+            .ReturnsAsync((Expression<Func<Appointment, bool>> predicate) =>
+            {
+                var compiled = predicate.Compile();
+                if (compiled(existingAppointment))
+                    return new[] { existingAppointment };
+                return Enumerable.Empty<Appointment>();
+            });
+        _unitOfWorkMock.Setup(u => u.Appointments).Returns(appointmentRepoMock.Object);
+
+        _availabilityServiceMock.Setup(a => a.IsSlotAvailableAsync(It.IsAny<int>(), It.IsAny<DateTime>(), It.IsAny<TimeSpan>(), It.IsAny<TimeSpan>()))
+            .ReturnsAsync(true);
+
+        // All consultants are busy
+        var consultantRepoMock = new Mock<IRepository<Consultant>>();
+        consultantRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<Consultant, bool>>>()))
+            .ReturnsAsync(new[] { new Consultant { Id = 1, BranchId = 1, IsActive = true, FirstName = "Test", LastName = "Consultant" }});
+        _unitOfWorkMock.Setup(u => u.Consultants).Returns(consultantRepoMock.Object);
+
+        // Setup HasActiveTransaction to return false (no transaction started)
+        _unitOfWorkMock.Setup(u => u.HasActiveTransaction()).Returns(false);
+
+        // Act & Assert - Should throw ConflictException, NOT InvalidOperationException
+        var exception = await Assert.ThrowsAsync<ConflictException>(() => 
+            _appointmentService.CreateAppointmentAsync(dto));
+        
+        // Verify that RollbackTransactionAsync was never called (since no transaction was started)
+        _unitOfWorkMock.Verify(u => u.RollbackTransactionAsync(), Times.Never);
+        
+        // Verify HasActiveTransaction was called to check before potential rollback
+        _unitOfWorkMock.Verify(u => u.HasActiveTransaction(), Times.Never); // Actually not called since exception thrown before try block
+    }
+
+    [Fact]
+    public async Task CreateAppointmentAsync_ErrorAfterTransactionStarted_RollsBackTransaction()
+    {
+        // Arrange - This test verifies that when an exception occurs AFTER the transaction is started,
+        // the rollback is correctly performed
+        var dto = new CreateAppointmentDto
+        {
+            BranchId = 1,
+            ServiceId = 1,
+            AppointmentDate = DateTime.Today.AddDays(1),
+            StartTime = new TimeSpan(10, 0, 0),
+            Customer = new CustomerDto
+            {
+                FirstName = "John",
+                LastName = "Doe",
+                Email = "john@example.com",
+                Phone = "0123456789"
+            }
+        };
+
+        var service = new Service { Id = 1, DurationMinutes = 30 };
+        var serviceRepoMock = new Mock<IRepository<Service>>();
+        serviceRepoMock.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(service);
+        _unitOfWorkMock.Setup(u => u.Services).Returns(serviceRepoMock.Object);
+
+        var branchHoursRepoMock = new Mock<IRepository<BranchOperatingHours>>();
+        branchHoursRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<BranchOperatingHours, bool>>>()))
+            .ReturnsAsync(new[] { new BranchOperatingHours 
+            { 
+                BranchId = 1, 
+                DayOfWeek = dto.AppointmentDate.DayOfWeek,
+                OpenTime = new TimeSpan(8, 0, 0),
+                CloseTime = new TimeSpan(17, 0, 0),
+                IsClosed = false
+            }});
+        _unitOfWorkMock.Setup(u => u.BranchOperatingHours).Returns(branchHoursRepoMock.Object);
+
+        // Mock customer repository - customer exists
+        var customer = new Customer { Id = 1, Email = "john@example.com", FirstName = "John", LastName = "Doe", Phone = "0123456789" };
+        var customerRepoMock = new Mock<IRepository<Customer>>();
+        customerRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<Customer, bool>>>()))
+            .ReturnsAsync(new[] { customer });
+        _unitOfWorkMock.Setup(u => u.Customers).Returns(customerRepoMock.Object);
+
+        // No overlapping appointments
+        var appointmentRepoMock = new Mock<IAppointmentRepository>();
+        appointmentRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<Appointment, bool>>>()))
+            .ReturnsAsync(Enumerable.Empty<Appointment>());
+        
+        // Simulate error during confirmation code generation (inside the transaction)
+        appointmentRepoMock.Setup(r => r.ConfirmationCodeExistsAsync(It.IsAny<string>()))
+            .ThrowsAsync(new InvalidOperationException("Simulated database error"));
+        
+        _unitOfWorkMock.Setup(u => u.Appointments).Returns(appointmentRepoMock.Object);
+
+        _availabilityServiceMock.Setup(a => a.IsSlotAvailableAsync(It.IsAny<int>(), It.IsAny<DateTime>(), It.IsAny<TimeSpan>(), It.IsAny<TimeSpan>()))
+            .ReturnsAsync(true);
+
+        var consultant = new Consultant { Id = 1, BranchId = 1, IsActive = true, FirstName = "Test", LastName = "Consultant" };
+        var consultantRepoMock = new Mock<IRepository<Consultant>>();
+        consultantRepoMock.Setup(r => r.FindAsync(It.IsAny<Expression<Func<Consultant, bool>>>()))
+            .ReturnsAsync(new[] { consultant });
+        _unitOfWorkMock.Setup(u => u.Consultants).Returns(consultantRepoMock.Object);
+
+        // Transaction is started
+        _unitOfWorkMock.Setup(u => u.BeginTransactionAsync()).Returns(Task.CompletedTask);
+        // HasActiveTransaction returns true (transaction was started)
+        _unitOfWorkMock.Setup(u => u.HasActiveTransaction()).Returns(true);
+        _unitOfWorkMock.Setup(u => u.RollbackTransactionAsync()).Returns(Task.CompletedTask);
+
+        // Act & Assert - Should throw InvalidOperationException from the simulated error
+        await Assert.ThrowsAsync<InvalidOperationException>(() => 
+            _appointmentService.CreateAppointmentAsync(dto));
+        
+        // Verify that BeginTransactionAsync was called
+        _unitOfWorkMock.Verify(u => u.BeginTransactionAsync(), Times.Once);
+        
+        // Verify HasActiveTransaction was called to check before rollback
+        _unitOfWorkMock.Verify(u => u.HasActiveTransaction(), Times.Once);
+        
+        // Verify that RollbackTransactionAsync WAS called (since transaction was active)
+        _unitOfWorkMock.Verify(u => u.RollbackTransactionAsync(), Times.Once);
+    }
+
+    [Fact]
     public async Task CreateAppointmentAsync_WithAvailableConsultant_AssignsConsultant()
     {
         // Arrange
