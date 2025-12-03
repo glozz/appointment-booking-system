@@ -5,11 +5,26 @@
     var prevDate = selectedDate.AddDays(-1);
     var nextDate = selectedDate.AddDays(1);
     var isToday = selectedDate.Date == DateTime.Today;
+    var isAdmin = ViewBag.IsAdmin as bool? ?? false;
+    var selectedConsultantId = ViewBag.SelectedConsultantId as int?;
 }
 
 <div class="container my-5">
     <div class="row">
         <div class="col-12">
+            @if (isAdmin)
+            {
+                <div class="alert alert-info d-flex justify-content-between align-items-center mb-4">
+                    <span>
+                        <i class="bi bi-shield-check"></i> 
+                        <strong>Admin View:</strong> Viewing @(Model.Consultant?.FullName ?? "Consultant")'s schedule
+                    </span>
+                    <a asp-action="Dashboard" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-arrow-left-right"></i> Switch Consultant
+                    </a>
+                </div>
+            }
+            
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div>
                     <h1><i class="bi bi-calendar3 text-primary"></i> Schedule</h1>
@@ -17,7 +32,7 @@
                         @(Model.Consultant?.FullName ?? "Consultant")
                     </p>
                 </div>
-                <a asp-action="Dashboard" class="btn btn-outline-secondary">
+                <a asp-action="Dashboard" asp-route-consultantId="@selectedConsultantId" class="btn btn-outline-secondary">
                     <i class="bi bi-arrow-left"></i> Back to Dashboard
                 </a>
             </div>
@@ -35,13 +50,17 @@
                 <div class="card-body">
                     <div class="row align-items-center">
                         <div class="col-md-4 text-start">
-                            <a asp-action="Schedule" asp-route-date="@prevDate.ToString("yyyy-MM-dd")" class="btn btn-outline-secondary">
+                            <a asp-action="Schedule" asp-route-date="@prevDate.ToString("yyyy-MM-dd")" asp-route-consultantId="@selectedConsultantId" class="btn btn-outline-secondary">
                                 <i class="bi bi-arrow-left"></i> @prevDate.ToString("MMM dd")
                             </a>
                         </div>
                         <div class="col-md-4 text-center">
                             <form asp-action="Schedule" method="get" class="d-inline-flex align-items-center gap-2">
                                 <input type="date" name="date" value="@selectedDate.ToString("yyyy-MM-dd")" class="form-control" style="width: auto;" onchange="this.form.submit()" />
+                                @if (selectedConsultantId.HasValue)
+                                {
+                                    <input type="hidden" name="consultantId" value="@selectedConsultantId.Value" />
+                                }
                             </form>
                             <br/>
                             <h4 class="mt-2 mb-0">@selectedDate.ToString("dddd, MMMM dd, yyyy")</h4>
@@ -53,11 +72,11 @@
                         <div class="col-md-4 text-end">
                             @if (!isToday)
                             {
-                                <a asp-action="Schedule" asp-route-date="@DateTime.Today.ToString("yyyy-MM-dd")" class="btn btn-primary me-2">
+                                <a asp-action="Schedule" asp-route-date="@DateTime.Today.ToString("yyyy-MM-dd")" asp-route-consultantId="@selectedConsultantId" class="btn btn-primary me-2">
                                     <i class="bi bi-calendar-day"></i> Today
                                 </a>
                             }
-                            <a asp-action="Schedule" asp-route-date="@nextDate.ToString("yyyy-MM-dd")" class="btn btn-outline-secondary">
+                            <a asp-action="Schedule" asp-route-date="@nextDate.ToString("yyyy-MM-dd")" asp-route-consultantId="@selectedConsultantId" class="btn btn-outline-secondary">
                                 @nextDate.ToString("MMM dd") <i class="bi bi-arrow-right"></i>
                             </a>
                         </div>
@@ -168,6 +187,10 @@
                                                                 @Html.AntiForgeryToken()
                                                                 <input type="hidden" name="id" value="@apt.Id" />
                                                                 <input type="hidden" name="status" value="@AppointmentBooking.Core.Enums.AppointmentStatus.Completed" />
+                                                                @if (selectedConsultantId.HasValue)
+                                                                {
+                                                                    <input type="hidden" name="consultantId" value="@selectedConsultantId.Value" />
+                                                                }
                                                                 <button type="submit" class="btn btn-success btn-sm">
                                                                     <i class="bi bi-check-circle"></i> Mark Complete
                                                                 </button>

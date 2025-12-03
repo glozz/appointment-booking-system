@@ -31,19 +31,20 @@
                     {
                         @if (User.IsInRole("Consultant") || User.IsInRole("Admin"))
                         {
+                            var consultantId = ViewBag.SelectedConsultantId as int?;
                             <!-- Consultant Menu -->
                             <li class="nav-item">
-                                <a class="nav-link" asp-controller="ConsultantPortal" asp-action="Dashboard">
+                                <a class="nav-link" asp-controller="ConsultantPortal" asp-action="Dashboard" asp-route-consultantId="@consultantId">
                                     <i class="bi bi-calendar2-week"></i> My Schedule
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link" asp-controller="ConsultantPortal" asp-action="TodaySchedule">
+                                <a class="nav-link" asp-controller="ConsultantPortal" asp-action="TodaySchedule" asp-route-consultantId="@consultantId">
                                     <i class="bi bi-calendar-day"></i> Today
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link" asp-controller="ConsultantPortal" asp-action="Upcoming">
+                                <a class="nav-link" asp-controller="ConsultantPortal" asp-action="Upcoming" asp-route-consultantId="@consultantId">
                                     <i class="bi bi-calendar-plus"></i> Upcoming
                                 </a>
                             </li>
