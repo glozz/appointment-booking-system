@@ -304,6 +304,10 @@ If you make code changes:
 docker-compose up -d --build
 ```
 
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
 ## License
 
 MIT License
