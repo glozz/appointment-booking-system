@@ -3,16 +3,14 @@ using System.Net.Http.Headers;
 namespace AppointmentBooking.Web.Handlers;
 
 /// <summary>
-/// DelegatingHandler that attaches JWT token from session to outgoing HttpClient requests
+/// HTTP message handler that automatically attaches JWT token from session to API requests
 /// </summary>
 public class JwtTokenHandler : DelegatingHandler
 {
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly ILogger<JwtTokenHandler> _logger;
 
-    public JwtTokenHandler(
-        IHttpContextAccessor httpContextAccessor,
-        ILogger<JwtTokenHandler> logger)
+    public JwtTokenHandler(IHttpContextAccessor httpContextAccessor, ILogger<JwtTokenHandler> logger)
     {
         _httpContextAccessor = httpContextAccessor;
         _logger = logger;
@@ -22,18 +20,18 @@ public class JwtTokenHandler : DelegatingHandler
         HttpRequestMessage request,
         CancellationToken cancellationToken)
     {
-        var httpContext = _httpContextAccessor.HttpContext;
+        // Get JWT token from session
+        var token = _httpContextAccessor.HttpContext?.Session.GetString("JwtToken");
 
-        // Attach JWT token from session if available
-        var jwtToken = httpContext?.Session.GetString("JwtToken");
-        if (!string.IsNullOrEmpty(jwtToken))
+        if (!string.IsNullOrEmpty(token))
         {
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", jwtToken);
-            _logger.LogDebug("Attached JWT token to request for {Uri}", request.RequestUri);
+            // Attach token to Authorization header
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            _logger.LogDebug("JWT token attached to request: {Method} {Uri}", request.Method, request.RequestUri);
         }
         else
         {
-            _logger.LogDebug("No JWT token found in session for request to {Uri}", request.RequestUri);
+            _logger.LogDebug("No JWT token in session for request: {Method} {Uri}", request.Method, request.RequestUri);
         }
 
         return await base.SendAsync(request, cancellationToken);
