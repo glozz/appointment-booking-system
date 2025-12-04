@@ -135,15 +135,28 @@ public class JwtTokenHandlerTests
     {
         var sessionMock = new Mock<ISession>();
 
-        if (jwtToken != null)
+        // Session.GetString() is an extension method that calls TryGetValue internally
+        // We need to set up TryGetValue to return the proper byte array
+        if (!string.IsNullOrEmpty(jwtToken))
         {
             var tokenBytes = System.Text.Encoding.UTF8.GetBytes(jwtToken);
-            sessionMock.Setup(s => s.TryGetValue("JwtToken", out tokenBytes)).Returns(true);
+            sessionMock
+                .Setup(s => s.TryGetValue("JwtToken", out It.Ref<byte[]?>.IsAny))
+                .Callback(new TryGetValueCallback((string key, out byte[]? value) =>
+                {
+                    value = tokenBytes;
+                }))
+                .Returns(true);
         }
         else
         {
-            byte[]? nullBytes = null;
-            sessionMock.Setup(s => s.TryGetValue("JwtToken", out nullBytes)).Returns(false);
+            sessionMock
+                .Setup(s => s.TryGetValue("JwtToken", out It.Ref<byte[]?>.IsAny))
+                .Callback(new TryGetValueCallback((string key, out byte[]? value) =>
+                {
+                    value = null;
+                }))
+                .Returns(false);
         }
 
         var httpContextMock = new Mock<HttpContext>();
@@ -151,6 +164,9 @@ public class JwtTokenHandlerTests
 
         return httpContextMock.Object;
     }
+
+    // Delegate for TryGetValue callback
+    private delegate void TryGetValueCallback(string key, out byte[]? value);
 
     /// <summary>
     /// Testable version of JwtTokenHandler that exposes SendAsync for testing
