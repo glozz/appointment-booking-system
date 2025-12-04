@@ -1,7 +1,7 @@
 using System.Text;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -120,10 +120,10 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Add health checks
+// ===== HEALTH CHECKS =====
 builder.Services.AddHealthChecks()
     .AddSqlServer(
-        connectionString: builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string not found"),
+        connectionString: builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found. Please configure it in appsettings.json or environment variables."),
         name: "sqlserver",
         tags: new[] { "db", "sql", "sqlserver" });
 
@@ -152,6 +152,29 @@ app.UseHttpsRedirection();
 app.UseCors("AllowAll");
 app.UseAuthentication();
 app.UseAuthorization();
+
+// ===== HEALTH CHECK ENDPOINT =====
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    ResponseWriter = async (context, report) =>
+    {
+        context.Response.ContentType = "application/json";
+        var result = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            status = report.Status.ToString(),
+            checks = report.Entries.Select(e => new
+            {
+                name = e.Key,
+                status = e.Value.Status.ToString(),
+                description = e.Value.Description,
+                duration = e.Value.Duration.ToString()
+            }),
+            totalDuration = report.TotalDuration.ToString()
+        });
+        await context.Response.WriteAsync(result);
+    }
+});
+
 app.MapControllers();
 
 // Health check endpoint
