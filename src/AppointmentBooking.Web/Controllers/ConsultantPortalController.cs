@@ -311,6 +311,36 @@ public class ConsultantPortalController : Controller
     /// <param name="selectedConsultantId">Optional consultant ID selected by admin</param>
     private async Task<int?> GetCurrentConsultantIdAsync(int? selectedConsultantId = null)
     {
+        // Get user ID from claims first (needed for both consultant and admin paths)
+        var userIdClaim = User.FindFirst("UserId")?.Value ?? User.FindFirst("sub")?.Value;
+        
+        // Security: Check if user is a Consultant (non-Admin) FIRST
+        // Consultants can ONLY view their own schedules - ignore any consultantId parameter
+        if (User.IsInRole("Consultant") && !User.IsInRole("Admin"))
+        {
+            if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out var consultantUserId))
+            {
+                return null;
+            }
+            
+            var consultant = await _consultantService.GetConsultantByUserIdAsync(consultantUserId);
+            if (consultant == null)
+            {
+                return null;
+            }
+            
+            // Log if consultant attempted to access another consultant's data (URL parameter tampering)
+            if (selectedConsultantId.HasValue && selectedConsultantId.Value != consultant.Id)
+            {
+                _logger.LogWarning(
+                    "Consultant (UserId: {UserId}, ConsultantId: {ConsultantId}) attempted unauthorized access to consultant {AttemptedConsultantId}",
+                    consultantUserId, consultant.Id, selectedConsultantId.Value);
+            }
+            
+            // ALWAYS return their own consultant ID - never allow access to other consultants
+            return consultant.Id;
+        }
+        
         // For admin users with a selected consultant, validate and return that ID
         if (User.IsInRole("Admin") && selectedConsultantId.HasValue)
         {
@@ -324,14 +354,19 @@ public class ConsultantPortalController : Controller
             return null;
         }
         
-        // For regular consultant users, get their linked consultant ID
-        var userIdClaim = User.FindFirst("UserId")?.Value ?? User.FindFirst("sub")?.Value;
+        // For admin users without a selected consultant, return null to trigger selection page
+        if (User.IsInRole("Admin"))
+        {
+            return null;
+        }
+        
+        // Fallback for other users (shouldn't happen due to [Authorize] attribute, but be safe)
         if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out var userId))
         {
             return null;
         }
 
-        var consultant = await _consultantService.GetConsultantByUserIdAsync(userId);
-        return consultant?.Id;
+        var fallbackConsultant = await _consultantService.GetConsultantByUserIdAsync(userId);
+        return fallbackConsultant?.Id;
     }
 }
