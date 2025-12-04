@@ -1,16 +1,16 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using AppointmentBooking.Application.Interfaces;
+using AppointmentBooking.Web.ApiClients;
 using AppointmentBooking.Web.Models;
 
 namespace AppointmentBooking.Web.Controllers;
 
 public class HomeController : Controller
 {
-    private readonly IBranchService _branchService;
-    private readonly IServiceService _serviceService;
+    private readonly IApiBranchService _branchService;
+    private readonly IApiServiceService _serviceService;
 
-    public HomeController(IBranchService branchService, IServiceService serviceService)
+    public HomeController(IApiBranchService branchService, IApiServiceService serviceService)
     {
         _branchService = branchService;
         _serviceService = serviceService;

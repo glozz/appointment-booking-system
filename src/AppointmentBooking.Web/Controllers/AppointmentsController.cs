@@ -1,11 +1,8 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 using AppointmentBooking.Application.DTOs;
-using AppointmentBooking.Application.Interfaces;
-using AppointmentBooking.Core.Exceptions;
-using AppointmentBooking.Core.Interfaces;
+using AppointmentBooking.Web.ApiClients;
 
 namespace AppointmentBooking.Web.Controllers;
 
@@ -27,26 +24,23 @@ namespace AppointmentBooking.Web.Controllers;
 [Authorize]
 public class AppointmentsController : Controller
 {
-    private readonly IAppointmentService _appointmentService;
-    private readonly IBranchService _branchService;
-    private readonly IServiceService _serviceService;
-    private readonly IAvailabilityService _availabilityService;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly IApiAppointmentService _appointmentService;
+    private readonly IApiBranchService _branchService;
+    private readonly IApiServiceService _serviceService;
+    private readonly IApiAvailabilityService _availabilityService;
     private readonly ILogger<AppointmentsController> _logger;
 
     public AppointmentsController(
-        IAppointmentService appointmentService,
-        IBranchService branchService,
-        IServiceService serviceService,
-        IAvailabilityService availabilityService,
-        IUnitOfWork unitOfWork,
+        IApiAppointmentService appointmentService,
+        IApiBranchService branchService,
+        IApiServiceService serviceService,
+        IApiAvailabilityService availabilityService,
         ILogger<AppointmentsController> logger)
     {
         _appointmentService = appointmentService;
         _branchService = branchService;
         _serviceService = serviceService;
         _availabilityService = availabilityService;
-        _unitOfWork = unitOfWork;
         _logger = logger;
     }
 
@@ -55,10 +49,10 @@ public class AppointmentsController : Controller
         ViewBag.Branches = await _branchService.GetActiveBranchesAsync();
         ViewBag.Services = await _serviceService.GetActiveServicesAsync();
         
-        // Pre-populate customer details from logged-in user
+        // Pre-populate customer details from logged-in user claims
         var model = new CreateAppointmentDto
         {
-            Customer = await GetLoggedInUserCustomerDtoAsync()
+            Customer = GetLoggedInUserCustomerDto()
         };
         
         return View(model);
@@ -68,7 +62,7 @@ public class AppointmentsController : Controller
     public async Task<IActionResult> Book(CreateAppointmentDto dto)
     {
         // Re-resolve customer from authenticated user (don't trust posted values)
-        dto.Customer = await GetLoggedInUserCustomerDtoAsync();
+        dto.Customer = GetLoggedInUserCustomerDto();
         
         if (!ModelState.IsValid)
         {
@@ -77,41 +71,27 @@ public class AppointmentsController : Controller
             return View(dto);
         }
 
-        try
+        var appointment = await _appointmentService.CreateAppointmentAsync(dto);
+        if (appointment == null)
         {
-            var appointment = await _appointmentService.CreateAppointmentAsync(dto);
-            return RedirectToAction(nameof(Confirmation), new { code = appointment.ConfirmationCode });
-        }
-        catch (ConflictException ex)
-        {
-            ModelState.AddModelError("", ex.Message);
+            ModelState.AddModelError("", "Failed to create appointment. Please try again.");
             ViewBag.Branches = await _branchService.GetActiveBranchesAsync();
             ViewBag.Services = await _serviceService.GetActiveServicesAsync();
             return View(dto);
         }
-        catch (ValidationException ex)
-        {
-            ModelState.AddModelError("", ex.Message);
-            ViewBag.Branches = await _branchService.GetActiveBranchesAsync();
-            ViewBag.Services = await _serviceService.GetActiveServicesAsync();
-            return View(dto);
-        }
+        
+        return RedirectToAction(nameof(Confirmation), new { code = appointment.ConfirmationCode });
     }
 
     /// <summary>
-    /// Retrieves customer information from the authenticated user's claims and existing records.
+    /// Retrieves customer information from the authenticated user's claims.
     /// 
     /// Security: This method ONLY uses the email from authenticated claims, not from user input.
     /// This ensures users can only access their own customer data.
     /// 
-    /// Flow:
-    /// 1. Get authenticated user's email from JWT/cookie claims
-    /// 2. Check if a Customer record exists with that email
-    /// 3. If Customer exists, use that data (may have more complete info like phone)
-    /// 4. If not, fall back to User record for additional details
-    /// 5. Return CustomerDto with available data
+    /// The API will handle looking up or creating the Customer record based on this data.
     /// </summary>
-    private async Task<CustomerDto> GetLoggedInUserCustomerDtoAsync()
+    private CustomerDto GetLoggedInUserCustomerDto()
     {
         // SECURITY: Email is retrieved from authenticated claims, not user input
         var authenticatedEmail = User.FindFirstValue(ClaimTypes.Email) ?? string.Empty;
@@ -122,41 +102,6 @@ public class AppointmentsController : Controller
         {
             _logger.LogWarning("Authenticated user has no email claim. User identity: {Identity}", 
                 User.Identity?.Name ?? "unknown");
-            return new CustomerDto
-            {
-                FirstName = firstName,
-                LastName = lastName,
-                Email = string.Empty,
-                Phone = string.Empty
-            };
-        }
-        
-        _logger.LogDebug("Retrieving customer data for authenticated user: {Email}", authenticatedEmail);
-        
-        var phone = string.Empty;
-        
-        // First, try to get data from existing Customer record
-        var customers = await _unitOfWork.Customers.FindAsync(c => c.Email == authenticatedEmail);
-        var existingCustomer = customers.FirstOrDefault();
-        
-        if (existingCustomer != null)
-        {
-            // Use existing customer data - it may have more complete information
-            firstName = !string.IsNullOrEmpty(firstName) ? firstName : existingCustomer.FirstName;
-            lastName = !string.IsNullOrEmpty(lastName) ? lastName : existingCustomer.LastName;
-            phone = existingCustomer.Phone;
-        }
-        else
-        {
-            // Fall back to User record for additional details (like phone)
-            var users = await _unitOfWork.Users.FindAsync(u => u.Email == authenticatedEmail);
-            var user = users.FirstOrDefault();
-            if (user != null)
-            {
-                phone = user.Phone ?? string.Empty;
-                firstName = !string.IsNullOrEmpty(firstName) ? firstName : user.FirstName;
-                lastName = !string.IsNullOrEmpty(lastName) ? lastName : user.LastName;
-            }
         }
         
         return new CustomerDto
@@ -164,7 +109,7 @@ public class AppointmentsController : Controller
             FirstName = firstName,
             LastName = lastName,
             Email = authenticatedEmail,
-            Phone = phone
+            Phone = string.Empty
         };
     }
 
@@ -207,15 +152,12 @@ public class AppointmentsController : Controller
     [HttpPost]
     public async Task<IActionResult> Cancel(int id, string reason)
     {
-        try
-        {
-            await _appointmentService.CancelAppointmentAsync(id, reason);
-            return RedirectToAction(nameof(CancelConfirmation));
-        }
-        catch (NotFoundException)
+        var success = await _appointmentService.CancelAppointmentAsync(id, reason);
+        if (!success)
         {
             return NotFound();
         }
+        return RedirectToAction(nameof(CancelConfirmation));
     }
 
     public IActionResult CancelConfirmation()

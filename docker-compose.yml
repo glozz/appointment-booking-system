@@ -37,6 +37,12 @@ services:
         condition: service_healthy
     networks:
       - appointment-network
+    healthcheck:
+      test: curl --fail http://localhost:80/health || exit 1
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
 
   web:
     build:
@@ -46,11 +52,11 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:80
-      - ConnectionStrings__DefaultConnection=Server=sqlserver,1433;Database=AppointmentBookingDb;User Id=sa;Password=YourStrong@Passw0rd;TrustServerCertificate=True;
+      - ApiBaseUrl=http://api:80
     ports:
       - "5001:80"
     depends_on:
-      sqlserver:
+      api:
         condition: service_healthy
     networks:
       - appointment-network

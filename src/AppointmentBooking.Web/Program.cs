@@ -1,17 +1,8 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.Authorization;
-using Microsoft.EntityFrameworkCore;
-using AppointmentBooking.Application.Interfaces;
-using AppointmentBooking.Application.Services;
-using AppointmentBooking.Application.Mappings;
-using AppointmentBooking.Application.Validators;
-using AppointmentBooking.Core.Interfaces;
-using AppointmentBooking.Infrastructure.Data;
-using AppointmentBooking.Infrastructure.Repositories;
+using AppointmentBooking.Web.ApiClients;
 using AppointmentBooking.Web.Services;
-using FluentValidation;
-using FluentValidation.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -46,54 +37,72 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.SlidingExpiration = true;
     });
 
-// Register AccessTokenHandler
+// Register AccessTokenHandler for forwarding auth tokens to API
 builder.Services.AddTransient<AccessTokenHandler>();
 
+// API Base URL configuration
+var apiBaseUrl = builder.Configuration["ApiBaseUrl"] ?? "http://localhost:5000";
 
-builder.Services.AddHttpClient("AuthApi", c => c.BaseAddress = new Uri("https://localhost:61577/"))
-    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
-    {
-        ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
-    });
+// Configure HttpClient for Auth API (login/register)
+builder.Services.AddHttpClient("AuthApi", client =>
+{
+    client.BaseAddress = new Uri(apiBaseUrl);
+    client.DefaultRequestHeaders.Add("Accept", "application/json");
+})
+.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+{
+    ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+});
 
-// HttpClient for Auth API
-//var apiBaseUrl = builder.Configuration["ApiSettings:BaseUrl"] ?? "http://localhost:5000";
-//builder.Services.AddHttpClient("AuthApi", client =>
-//{
-//    client.BaseAddress = new Uri(apiBaseUrl);
-//    client.DefaultRequestHeaders.Add("Accept", "application/json");
-//})
-//.AddHttpMessageHandler<AccessTokenHandler>();
+// Configure HttpClient for API with access token forwarding
+builder.Services.AddHttpClient("BackendApi", client =>
+{
+    client.BaseAddress = new Uri(apiBaseUrl);
+    client.DefaultRequestHeaders.Add("Accept", "application/json");
+})
+.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+{
+    ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+})
+.AddHttpMessageHandler<AccessTokenHandler>();
 
-// Database
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+// Register API Client Services
+builder.Services.AddScoped<IApiBranchService>(sp =>
+{
+    var factory = sp.GetRequiredService<IHttpClientFactory>();
+    var logger = sp.GetRequiredService<ILogger<ApiBranchService>>();
+    return new ApiBranchService(factory.CreateClient("BackendApi"), logger);
+});
 
-// AutoMapper
-builder.Services.AddAutoMapper(typeof(AutoMapperProfile));
+builder.Services.AddScoped<IApiServiceService>(sp =>
+{
+    var factory = sp.GetRequiredService<IHttpClientFactory>();
+    var logger = sp.GetRequiredService<ILogger<ApiServiceService>>();
+    return new ApiServiceService(factory.CreateClient("BackendApi"), logger);
+});
 
-// FluentValidation
-builder.Services.AddValidatorsFromAssemblyContaining<CreateAppointmentValidator>();
-builder.Services.AddFluentValidationAutoValidation();
+builder.Services.AddScoped<IApiAvailabilityService>(sp =>
+{
+    var factory = sp.GetRequiredService<IHttpClientFactory>();
+    var logger = sp.GetRequiredService<ILogger<ApiAvailabilityService>>();
+    return new ApiAvailabilityService(factory.CreateClient("BackendApi"), logger);
+});
 
-// Repositories
-builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+builder.Services.AddScoped<IApiAppointmentService>(sp =>
+{
+    var factory = sp.GetRequiredService<IHttpClientFactory>();
+    var logger = sp.GetRequiredService<ILogger<ApiAppointmentService>>();
+    return new ApiAppointmentService(factory.CreateClient("BackendApi"), logger);
+});
 
-// Application Services
-builder.Services.AddScoped<IAppointmentService, AppointmentService>();
-builder.Services.AddScoped<IBranchService, BranchService>();
-builder.Services.AddScoped<IServiceService, ServiceService>();
-builder.Services.AddScoped<IAvailabilityService, AvailabilityService>();
-builder.Services.AddScoped<IConsultantService, ConsultantService>();
+builder.Services.AddScoped<IApiConsultantService>(sp =>
+{
+    var factory = sp.GetRequiredService<IHttpClientFactory>();
+    var logger = sp.GetRequiredService<ILogger<ApiConsultantService>>();
+    return new ApiConsultantService(factory.CreateClient("BackendApi"), logger);
+});
 
 var app = builder.Build();
-
-// Seed database
-using (var scope = app.Services.CreateScope())
-{
-    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    DbInitializer.Initialize(context);
-}
 
 if (!app.Environment.IsDevelopment())
 {

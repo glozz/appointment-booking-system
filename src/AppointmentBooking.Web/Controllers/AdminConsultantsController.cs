@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using AppointmentBooking.Application.Interfaces;
+using AppointmentBooking.Web.ApiClients;
 using AppointmentBooking.Web.Models;
 
 namespace AppointmentBooking.Web.Controllers;
@@ -11,11 +11,11 @@ namespace AppointmentBooking.Web.Controllers;
 [Authorize(Roles = "Admin")]
 public class AdminConsultantsController : Controller
 {
-    private readonly IConsultantService _consultantService;
+    private readonly IApiConsultantService _consultantService;
     private readonly ILogger<AdminConsultantsController> _logger;
 
     public AdminConsultantsController(
-        IConsultantService consultantService,
+        IApiConsultantService consultantService,
         ILogger<AdminConsultantsController> logger)
     {
         _consultantService = consultantService;

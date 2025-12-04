@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
 using AppointmentBooking.Application.DTOs;
-using AppointmentBooking.Application.Interfaces;
+using AppointmentBooking.Web.ApiClients;
 using AppointmentBooking.Web.Controllers;
 
 namespace AppointmentBooking.Web.Tests.Controllers;
@@ -15,14 +15,14 @@ namespace AppointmentBooking.Web.Tests.Controllers;
 /// </summary>
 public class ConsultantPortalControllerAuthorizationTests
 {
-    private readonly Mock<IAppointmentService> _appointmentServiceMock;
-    private readonly Mock<IConsultantService> _consultantServiceMock;
+    private readonly Mock<IApiAppointmentService> _appointmentServiceMock;
+    private readonly Mock<IApiConsultantService> _consultantServiceMock;
     private readonly Mock<ILogger<ConsultantPortalController>> _loggerMock;
 
     public ConsultantPortalControllerAuthorizationTests()
     {
-        _appointmentServiceMock = new Mock<IAppointmentService>();
-        _consultantServiceMock = new Mock<IConsultantService>();
+        _appointmentServiceMock = new Mock<IApiAppointmentService>();
+        _consultantServiceMock = new Mock<IApiConsultantService>();
         _loggerMock = new Mock<ILogger<ConsultantPortalController>>();
     }
 
