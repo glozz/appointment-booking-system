@@ -1,0 +1,75 @@
+@{
+    ViewData["Title"] = "Access Denied";
+}
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white text-center">
+                    <h4 class="mb-0">
+                        <i class="bi bi-shield-exclamation"></i> Access Denied
+                    </h4>
+                </div>
+                <div class="card-body text-center py-5">
+                    <div class="mb-4">
+                        <i class="bi bi-x-circle text-danger" style="font-size: 5rem;"></i>
+                    </div>
+                    <h5 class="card-title mb-3">You don't have permission to access this page</h5>
+                    <p class="card-text text-muted mb-4">
+                        The page you're trying to access requires specific permissions that your current account doesn't have.
+                        If you believe this is an error, please contact your administrator.
+                    </p>
+                    
+                    <hr class="my-4">
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            @if (User.IsInRole("Admin"))
+                            {
+                                <a asp-controller="AdminDashboard" asp-action="Index" class="btn btn-primary">
+                                    <i class="bi bi-speedometer2"></i> Go to Admin Dashboard
+                                </a>
+                            }
+                            else if (User.IsInRole("Consultant"))
+                            {
+                                <a asp-controller="ConsultantPortal" asp-action="Dashboard" class="btn btn-primary">
+                                    <i class="bi bi-calendar-check"></i> Go to My Dashboard
+                                </a>
+                            }
+                            else if (User.IsInRole("Customer"))
+                            {
+                                <a asp-controller="Appointments" asp-action="Index" class="btn btn-primary">
+                                    <i class="bi bi-person"></i> Go to My Account
+                                </a>
+                            }
+                            <a asp-controller="Home" asp-action="Index" class="btn btn-outline-secondary">
+                                <i class="bi bi-house"></i> Go to Home
+                            </a>
+                        }
+                        else
+                        {
+                            <a asp-controller="Account" asp-action="Login" class="btn btn-primary">
+                                <i class="bi bi-box-arrow-in-right"></i> Login
+                            </a>
+                            <a asp-controller="Home" asp-action="Index" class="btn btn-outline-secondary">
+                                <i class="bi bi-house"></i> Go to Home
+                            </a>
+                        }
+                    </div>
+                </div>
+                <div class="card-footer bg-light">
+                    <div class="text-center text-muted small">
+                        <p class="mb-1">
+                            <i class="bi bi-question-circle"></i> Need help?
+                        </p>
+                        <p class="mb-0">
+                            Contact support at <a href="mailto:support@appointmentbooking.com">support@appointmentbooking.com</a>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

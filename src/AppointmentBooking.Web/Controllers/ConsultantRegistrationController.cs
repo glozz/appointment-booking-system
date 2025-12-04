@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using AppointmentBooking.Application.DTOs;
-using AppointmentBooking.Application.Interfaces;
+using AppointmentBooking.Web.ApiClients;
 using AppointmentBooking.Web.Models;
 
 namespace AppointmentBooking.Web.Controllers;
@@ -12,13 +12,13 @@ namespace AppointmentBooking.Web.Controllers;
 /// </summary>
 public class ConsultantRegistrationController : Controller
 {
-    private readonly IConsultantService _consultantService;
-    private readonly IBranchService _branchService;
+    private readonly IApiConsultantService _consultantService;
+    private readonly IApiBranchService _branchService;
     private readonly ILogger<ConsultantRegistrationController> _logger;
 
     public ConsultantRegistrationController(
-        IConsultantService consultantService,
-        IBranchService branchService,
+        IApiConsultantService consultantService,
+        IApiBranchService branchService,
         ILogger<ConsultantRegistrationController> logger)
     {
         _consultantService = consultantService;

@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
-using AppointmentBooking.Application.Interfaces;
 using AppointmentBooking.Core.Enums;
+using AppointmentBooking.Web.ApiClients;
 using AppointmentBooking.Web.Models;
 
 namespace AppointmentBooking.Web.Controllers;
@@ -12,11 +12,11 @@ namespace AppointmentBooking.Web.Controllers;
 [Authorize]
 public class CustomerPortalController : Controller
 {
-    private readonly IAppointmentService _appointmentService;
+    private readonly IApiAppointmentService _appointmentService;
     private readonly ILogger<CustomerPortalController> _logger;
 
     public CustomerPortalController(
-        IAppointmentService appointmentService,
+        IApiAppointmentService appointmentService,
         ILogger<CustomerPortalController> logger)
     {
         _appointmentService = appointmentService;

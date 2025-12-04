@@ -191,6 +191,24 @@ public class AppointmentsController : ControllerBase
     }
 
     /// <summary>
+    /// Update appointment status
+    /// </summary>
+    [HttpPatch("{id}/status")]
+    [Authorize(Roles = "Consultant,Admin")]
+    public async Task<ActionResult> UpdateAppointmentStatus(int id, [FromBody] UpdateStatusRequest request)
+    {
+        try
+        {
+            await _appointmentService.UpdateAppointmentStatusAsync(id, request.Status);
+            return Ok(new { message = "Appointment status updated successfully" });
+        }
+        catch (NotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// Get the current user's email from claims
     /// </summary>
     private string? GetCurrentUserEmail()
@@ -201,3 +219,4 @@ public class AppointmentsController : ControllerBase
 }
 
 public record CancelAppointmentRequest(string Reason);
+public record UpdateStatusRequest(AppointmentStatus Status);
