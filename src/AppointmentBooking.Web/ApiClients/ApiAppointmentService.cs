@@ -1,5 +1,4 @@
 using System.Net.Http.Json;
-using System.Text;
 using System.Text.Json;
 using AppointmentBooking.Application.DTOs;
 using AppointmentBooking.Core.Enums;
@@ -130,8 +129,8 @@ public class ApiAppointmentService : IApiAppointmentService
     {
         try
         {
-            var dto = new UpdateAppointmentDto { Id = id, Status = status };
-            var response = await _httpClient.PutAsJsonAsync($"api/appointments/{id}", dto);
+            var request = new { Status = status };
+            var response = await _httpClient.PatchAsJsonAsync($"api/appointments/{id}/status", request);
             return response.IsSuccessStatusCode;
         }
         catch (Exception ex)
