@@ -11,6 +11,17 @@ namespace AppointmentBooking.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.Sql(@"
+                IF EXISTS (
+                    SELECT * FROM sys.indexes 
+                    WHERE name = 'IX_Appointments_BranchId_AppointmentDate_StartTime' 
+                    AND object_id = OBJECT_ID('Appointments')
+                )
+                BEGIN
+                    DROP INDEX [IX_Appointments_BranchId_AppointmentDate_StartTime] ON [Appointments];
+                END
+            ");
+
             migrationBuilder.CreateTable(
                 name: "AppointmentTypes",
                 columns: table => new
