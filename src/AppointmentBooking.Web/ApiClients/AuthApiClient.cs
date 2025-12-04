@@ -1,7 +1,7 @@
 using System.Net.Http.Json;
 using AppointmentBooking.Application.DTOs;
 
-namespace AppointmentBooking.Web.Services.ApiClients;
+namespace AppointmentBooking.Web.ApiClients;
 
 /// <summary>
 /// Implementation of authentication API client
@@ -37,15 +37,10 @@ public class AuthApiClient : IAuthApiClient
             
             return authResponse;
         }
-        catch (HttpRequestException ex)
-        {
-            _logger.LogError(ex, "Cannot connect to API. Is the API running?");
-            throw new InvalidOperationException("Unable to connect to authentication service. Please ensure the API is running.", ex);
-        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error calling login API");
-            throw;
+            _logger.LogError(ex, "Error calling login API");
+            return null;
         }
     }
 
@@ -69,15 +64,10 @@ public class AuthApiClient : IAuthApiClient
             
             return authResponse;
         }
-        catch (HttpRequestException ex)
-        {
-            _logger.LogError(ex, "Cannot connect to API for registration");
-            throw new InvalidOperationException("Unable to connect to authentication service.", ex);
-        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error calling register API");
-            throw;
+            _logger.LogError(ex, "Error calling register API");
+            return null;
         }
     }
 

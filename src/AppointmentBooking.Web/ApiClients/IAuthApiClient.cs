@@ -1,6 +1,6 @@
 using AppointmentBooking.Application.DTOs;
 
-namespace AppointmentBooking.Web.Services.ApiClients;
+namespace AppointmentBooking.Web.ApiClients;
 
 /// <summary>
 /// Interface for authentication API client
@@ -18,7 +18,7 @@ public interface IAuthApiClient
     Task<AuthResponseDto?> RegisterAsync(RegisterDto request);
 
     /// <summary>
-    /// Validate JWT token
+    /// Validate JWT token (uses token from current HttpContext)
     /// </summary>
     Task<bool> ValidateTokenAsync();
 }
