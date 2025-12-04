@@ -30,5 +30,10 @@ public class RegisterViewModel
     [Compare("Password", ErrorMessage = "Passwords do not match")]
     public string ConfirmPassword { get; set; } = string.Empty;
 
+    [Phone(ErrorMessage = "Invalid phone number")]
+    [StringLength(20, ErrorMessage = "Phone number cannot exceed 20 characters")]
+    [Display(Name = "Phone")]
+    public string? Phone { get; set; }
+
     public string? ReturnUrl { get; set; }
 }
