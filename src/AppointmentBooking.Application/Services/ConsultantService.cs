@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using AppointmentBooking.Application.DTOs;
 using AppointmentBooking.Application.Interfaces;
+using AppointmentBooking.Core.Entities;
 using AppointmentBooking.Core.Enums;
 using AppointmentBooking.Core.Interfaces;
 
@@ -21,6 +22,7 @@ public class ConsultantService : IConsultantService
     private static readonly TimeSpan DefaultOpenTime = new TimeSpan(8, 0, 0);  // 08:00
     private static readonly TimeSpan DefaultCloseTime = new TimeSpan(17, 0, 0); // 17:00
     private const int DefaultSlotDurationMinutes = 15;
+    private const int BcryptWorkFactor = 12;
 
     public ConsultantService(
         IUnitOfWork unitOfWork,
@@ -168,5 +170,214 @@ public class ConsultantService : IConsultantService
         }
 
         return schedule;
+    }
+
+    /// <inheritdoc />
+    public async Task<ConsultantRegistrationResultDto> RegisterConsultantAsync(ConsultantRegistrationDto dto)
+    {
+        _logger.LogInformation("Consultant registration attempt for email: {Email}", dto.Email);
+
+        // Check if email already exists
+        var existingUsers = await _unitOfWork.Users.FindAsync(u => u.Email == dto.Email.ToLowerInvariant());
+        if (existingUsers.Any())
+        {
+            _logger.LogWarning("Consultant registration failed - email already exists: {Email}", dto.Email);
+            return new ConsultantRegistrationResultDto 
+            { 
+                Success = false, 
+                Message = "Email address is already registered." 
+            };
+        }
+
+        // Validate password length (min 6 chars as per requirements)
+        if (string.IsNullOrEmpty(dto.Password) || dto.Password.Length < 6)
+        {
+            return new ConsultantRegistrationResultDto 
+            { 
+                Success = false, 
+                Message = "Password must be at least 6 characters." 
+            };
+        }
+
+        // Verify branch exists
+        var branch = await _unitOfWork.Branches.GetByIdAsync(dto.BranchId);
+        if (branch == null)
+        {
+            _logger.LogWarning("Consultant registration failed - invalid branch: {BranchId}", dto.BranchId);
+            return new ConsultantRegistrationResultDto 
+            { 
+                Success = false, 
+                Message = "Selected branch does not exist." 
+            };
+        }
+
+        try
+        {
+            await _unitOfWork.BeginTransactionAsync();
+
+            // Create inactive user account
+            var user = new User
+            {
+                FirstName = dto.FirstName,
+                LastName = dto.LastName,
+                Email = dto.Email.ToLowerInvariant(),
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password, BcryptWorkFactor),
+                Phone = dto.Phone,
+                Role = UserRole.Consultant,
+                IsActive = false, // Inactive until admin approves
+                EmailVerified = false,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await _unitOfWork.Users.AddAsync(user);
+            await _unitOfWork.SaveChangesAsync();
+
+            // Create consultant profile (also inactive)
+            var consultant = new Consultant
+            {
+                FirstName = dto.FirstName,
+                LastName = dto.LastName,
+                BranchId = dto.BranchId,
+                UserId = user.Id,
+                IsActive = false, // Inactive until admin approves
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await _unitOfWork.Consultants.AddAsync(consultant);
+            await _unitOfWork.SaveChangesAsync();
+
+            await _unitOfWork.CommitTransactionAsync();
+
+            _logger.LogInformation("Consultant registered successfully (pending approval): {Email}, ConsultantId: {ConsultantId}", 
+                dto.Email, consultant.Id);
+
+            return new ConsultantRegistrationResultDto
+            {
+                Success = true,
+                Message = "Registration successful. Your account is pending admin approval.",
+                ConsultantId = consultant.Id
+            };
+        }
+        catch (Exception ex)
+        {
+            await _unitOfWork.RollbackTransactionAsync();
+            _logger.LogError(ex, "Error during consultant registration for {Email}", dto.Email);
+            return new ConsultantRegistrationResultDto 
+            { 
+                Success = false, 
+                Message = "An error occurred during registration. Please try again." 
+            };
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<IEnumerable<PendingConsultantDto>> GetPendingConsultantsAsync()
+    {
+        _logger.LogDebug("Retrieving pending consultants");
+
+        var pendingConsultants = await _unitOfWork.Consultants.Query()
+            .Include(c => c.Branch)
+            .Include(c => c.User)
+            .Where(c => !c.IsActive && c.UserId != null && c.User != null && !c.User.IsActive)
+            .ToListAsync();
+
+        return pendingConsultants.Select(c => new PendingConsultantDto
+        {
+            ConsultantId = c.Id,
+            UserId = c.UserId!.Value,
+            FirstName = c.FirstName,
+            LastName = c.LastName,
+            Email = c.User!.Email,
+            Phone = c.User.Phone,
+            BranchId = c.BranchId,
+            BranchName = c.Branch?.Name ?? "",
+            RegisteredAt = c.CreatedAt
+        });
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> ActivateConsultantAsync(int consultantId)
+    {
+        _logger.LogInformation("Activating consultant with ID: {ConsultantId}", consultantId);
+
+        var consultant = await _unitOfWork.Consultants.GetByIdWithIncludesAsync(consultantId, c => c.User!);
+
+        if (consultant == null)
+        {
+            _logger.LogWarning("Consultant not found for activation: {ConsultantId}", consultantId);
+            return false;
+        }
+
+        if (consultant.User == null)
+        {
+            _logger.LogWarning("Consultant has no associated user: {ConsultantId}", consultantId);
+            return false;
+        }
+
+        try
+        {
+            await _unitOfWork.BeginTransactionAsync();
+
+            // Activate user account
+            consultant.User.IsActive = true;
+            consultant.User.UpdatedAt = DateTime.UtcNow;
+            await _unitOfWork.Users.UpdateAsync(consultant.User);
+
+            // Activate consultant profile
+            consultant.IsActive = true;
+            await _unitOfWork.Consultants.UpdateAsync(consultant);
+
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitTransactionAsync();
+
+            _logger.LogInformation("Consultant activated successfully: {ConsultantId}", consultantId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            await _unitOfWork.RollbackTransactionAsync();
+            _logger.LogError(ex, "Error activating consultant: {ConsultantId}", consultantId);
+            return false;
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> RejectConsultantAsync(int consultantId)
+    {
+        _logger.LogInformation("Rejecting consultant registration: {ConsultantId}", consultantId);
+
+        var consultant = await _unitOfWork.Consultants.GetByIdWithIncludesAsync(consultantId, c => c.User!);
+
+        if (consultant == null)
+        {
+            _logger.LogWarning("Consultant not found for rejection: {ConsultantId}", consultantId);
+            return false;
+        }
+
+        try
+        {
+            await _unitOfWork.BeginTransactionAsync();
+
+            // Delete consultant profile first
+            await _unitOfWork.Consultants.DeleteAsync(consultant);
+
+            // Delete associated user if exists
+            if (consultant.User != null)
+            {
+                await _unitOfWork.Users.DeleteAsync(consultant.User);
+            }
+
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitTransactionAsync();
+
+            _logger.LogInformation("Consultant registration rejected and deleted: {ConsultantId}", consultantId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            await _unitOfWork.RollbackTransactionAsync();
+            _logger.LogError(ex, "Error rejecting consultant: {ConsultantId}", consultantId);
+            return false;
+        }
     }
 }
