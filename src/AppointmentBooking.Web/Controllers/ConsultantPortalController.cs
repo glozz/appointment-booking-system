@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
-using AppointmentBooking.Application.Interfaces;
 using AppointmentBooking.Core.Enums;
+using AppointmentBooking.Web.ApiClients;
 using AppointmentBooking.Web.Models;
 
 namespace AppointmentBooking.Web.Controllers;
@@ -12,13 +12,13 @@ namespace AppointmentBooking.Web.Controllers;
 [Authorize(Roles = "Consultant,Admin")]
 public class ConsultantPortalController : Controller
 {
-    private readonly IAppointmentService _appointmentService;
-    private readonly IConsultantService _consultantService;
+    private readonly IApiAppointmentService _appointmentService;
+    private readonly IApiConsultantService _consultantService;
     private readonly ILogger<ConsultantPortalController> _logger;
 
     public ConsultantPortalController(
-        IAppointmentService appointmentService,
-        IConsultantService consultantService,
+        IApiAppointmentService appointmentService,
+        IApiConsultantService consultantService,
         ILogger<ConsultantPortalController> logger)
     {
         _appointmentService = appointmentService;

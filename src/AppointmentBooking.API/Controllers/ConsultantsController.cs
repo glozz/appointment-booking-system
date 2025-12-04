@@ -36,7 +36,7 @@ public class ConsultantsController : ControllerBase
     /// <summary>
     /// Get consultant by ID
     /// </summary>
-    [HttpGet("{id}")]
+    [HttpGet("{id:int}")]
     public async Task<ActionResult<ConsultantDto>> GetConsultant(int id)
     {
         var consultant = await _consultantService.GetConsultantByIdAsync(id);
@@ -44,9 +44,19 @@ public class ConsultantsController : ControllerBase
     }
 
     /// <summary>
+    /// Get consultant by user ID
+    /// </summary>
+    [HttpGet("user/{userId:int}")]
+    public async Task<ActionResult<ConsultantDto>> GetConsultantByUserId(int userId)
+    {
+        var consultant = await _consultantService.GetConsultantByUserIdAsync(userId);
+        return consultant == null ? NotFound() : Ok(consultant);
+    }
+
+    /// <summary>
     /// Get consultants by branch
     /// </summary>
-    [HttpGet("branch/{branchId}")]
+    [HttpGet("branch/{branchId:int}")]
     public async Task<ActionResult<IEnumerable<ConsultantDto>>> GetConsultantsByBranch(int branchId)
     {
         var consultants = await _consultantService.GetConsultantsByBranchAsync(branchId);
@@ -56,7 +66,7 @@ public class ConsultantsController : ControllerBase
     /// <summary>
     /// Get upcoming appointments for a consultant
     /// </summary>
-    [HttpGet("{id}/appointments/upcoming")]
+    [HttpGet("{id:int}/appointments/upcoming")]
     [Authorize(Roles = "Consultant,Admin")]
     public async Task<ActionResult<IEnumerable<AppointmentDto>>> GetUpcomingAppointments(int id)
     {
@@ -73,7 +83,7 @@ public class ConsultantsController : ControllerBase
     /// <summary>
     /// Get past appointments for a consultant
     /// </summary>
-    [HttpGet("{id}/appointments/past")]
+    [HttpGet("{id:int}/appointments/past")]
     [Authorize(Roles = "Consultant,Admin")]
     public async Task<ActionResult<IEnumerable<AppointmentDto>>> GetPastAppointments(int id)
     {
@@ -89,7 +99,7 @@ public class ConsultantsController : ControllerBase
     /// <summary>
     /// Get today's appointments for a consultant
     /// </summary>
-    [HttpGet("{id}/appointments/today")]
+    [HttpGet("{id:int}/appointments/today")]
     [Authorize(Roles = "Consultant,Admin")]
     public async Task<ActionResult<IEnumerable<AppointmentDto>>> GetTodayAppointments(int id)
     {
@@ -105,7 +115,7 @@ public class ConsultantsController : ControllerBase
     /// <summary>
     /// Get appointments for a consultant within a date range
     /// </summary>
-    [HttpGet("{id}/appointments")]
+    [HttpGet("{id:int}/appointments")]
     [Authorize(Roles = "Consultant,Admin")]
     public async Task<ActionResult<IEnumerable<AppointmentDto>>> GetAppointmentsByDateRange(
         int id, 
@@ -131,7 +141,7 @@ public class ConsultantsController : ControllerBase
     /// <summary>
     /// Get a consultant's schedule for a specific date
     /// </summary>
-    [HttpGet("{id}/schedule")]
+    [HttpGet("{id:int}/schedule")]
     [Authorize(Roles = "Consultant,Admin")]
     public async Task<ActionResult<ConsultantScheduleDto>> GetSchedule(int id, [FromQuery] DateTime? date)
     {
@@ -168,5 +178,69 @@ public class ConsultantsController : ControllerBase
         
         // Consultant can only access their own data
         return consultant?.Id == consultantId;
+    }
+
+    /// <summary>
+    /// Register a new consultant
+    /// </summary>
+    [HttpPost("register")]
+    [AllowAnonymous]
+    public async Task<ActionResult<ConsultantRegistrationResultDto>> RegisterConsultant([FromBody] ConsultantRegistrationDto dto)
+    {
+        var result = await _consultantService.RegisterConsultantAsync(dto);
+        
+        if (!result.Success)
+        {
+            return BadRequest(result);
+        }
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Get all pending consultant registrations (Admin only)
+    /// </summary>
+    [HttpGet("pending")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<IEnumerable<PendingConsultantDto>>> GetPendingConsultants()
+    {
+        var pendingConsultants = await _consultantService.GetPendingConsultantsAsync();
+        return Ok(pendingConsultants);
+    }
+
+    /// <summary>
+    /// Activate a pending consultant (Admin only)
+    /// </summary>
+    [HttpPost("{id:int}/activate")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult> ActivateConsultant(int id)
+    {
+        var result = await _consultantService.ActivateConsultantAsync(id);
+        
+        if (!result)
+        {
+            return NotFound(new { message = "Consultant not found or could not be activated" });
+        }
+
+        _logger.LogInformation("Consultant {ConsultantId} activated by admin", id);
+        return Ok(new { message = "Consultant activated successfully" });
+    }
+
+    /// <summary>
+    /// Reject a pending consultant registration (Admin only)
+    /// </summary>
+    [HttpPost("{id:int}/reject")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult> RejectConsultant(int id)
+    {
+        var result = await _consultantService.RejectConsultantAsync(id);
+        
+        if (!result)
+        {
+            return NotFound(new { message = "Consultant not found or could not be rejected" });
+        }
+
+        _logger.LogInformation("Consultant {ConsultantId} rejected by admin", id);
+        return Ok(new { message = "Consultant registration rejected" });
     }
 }
