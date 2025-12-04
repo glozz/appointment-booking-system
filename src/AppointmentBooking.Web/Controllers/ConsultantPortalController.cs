@@ -360,7 +360,7 @@ public class ConsultantPortalController : Controller
             return null;
         }
         
-        // Fallback for other users (shouldn't happen due to [Authorize] attribute, but be safe)
+        // Fallback for other users (shouldn't happen due to controller-level [Authorize] attribute, but be safe)
         if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out var userId))
         {
             return null;
