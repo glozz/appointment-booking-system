@@ -123,7 +123,7 @@ builder.Services.AddCors(options =>
 // ===== HEALTH CHECKS =====
 builder.Services.AddHealthChecks()
     .AddSqlServer(
-        connectionString: builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string not found"),
+        connectionString: builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found. Please configure it in appsettings.json or environment variables."),
         name: "sqlserver",
         tags: new[] { "db", "sql", "sqlserver" });
 
