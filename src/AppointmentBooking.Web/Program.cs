@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.Authorization;
 using AppointmentBooking.Web.ApiClients;
 using AppointmentBooking.Web.Services;
+using AppointmentBooking.Web.Services.ApiClients;
+using AppointmentBooking.Web.Handlers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,6 +20,18 @@ builder.Services.AddControllersWithViews(options =>
 
 // HttpContextAccessor for accessing HttpContext in services
 builder.Services.AddHttpContextAccessor();
+
+// ===== SESSION SUPPORT FOR JWT TOKENS =====
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromHours(24);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+    options.Cookie.SecurePolicy = builder.Environment.IsDevelopment() 
+        ? CookieSecurePolicy.SameAsRequest 
+        : CookieSecurePolicy.Always;
+    options.Cookie.Name = "AppointmentBooking.Session";
+});
 
 // Cookie Authentication
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -40,6 +54,9 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 // Register AccessTokenHandler for forwarding auth tokens to API
 builder.Services.AddTransient<AccessTokenHandler>();
 
+// ===== JWT TOKEN HANDLER =====
+builder.Services.AddTransient<JwtTokenHandler>();
+
 // API Base URL configuration
 var apiBaseUrl = builder.Configuration["ApiBaseUrl"] ?? "http://localhost:5000";
 
@@ -48,6 +65,18 @@ builder.Services.AddHttpClient("AuthApi", client =>
 {
     client.BaseAddress = new Uri(apiBaseUrl);
     client.DefaultRequestHeaders.Add("Accept", "application/json");
+})
+.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+{
+    ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+});
+
+// ===== AUTH API CLIENT (JWT authentication) =====
+builder.Services.AddHttpClient<IAuthApiClient, AuthApiClient>(client =>
+{
+    client.BaseAddress = new Uri(apiBaseUrl);
+    client.DefaultRequestHeaders.Add("Accept", "application/json");
+    client.Timeout = TimeSpan.FromSeconds(30);
 })
 .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
 {
@@ -64,7 +93,8 @@ builder.Services.AddHttpClient("BackendApi", client =>
 {
     ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
 })
-.AddHttpMessageHandler<AccessTokenHandler>();
+.AddHttpMessageHandler<JwtTokenHandler>()        // NEW: Add JWT token handler
+.AddHttpMessageHandler<AccessTokenHandler>();    // Keep existing if present
 
 // Register API Client Services
 builder.Services.AddScoped<IApiBranchService>(sp =>
@@ -113,6 +143,7 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
+app.UseSession();           // NEW: Add session middleware
 app.UseAuthentication();
 app.UseAuthorization();
 
