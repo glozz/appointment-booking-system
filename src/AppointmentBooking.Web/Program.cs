@@ -3,8 +3,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.Authorization;
 using AppointmentBooking.Web.ApiClients;
 using AppointmentBooking.Web.Services;
-using AppointmentBooking.Web.Services.ApiClients;
-using AppointmentBooking.Web.Handlers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,53 +16,34 @@ builder.Services.AddControllersWithViews(options =>
     options.Filters.Add(new AuthorizeFilter(policy));
 });
 
+// HttpContextAccessor for accessing HttpContext in services
 builder.Services.AddHttpContextAccessor();
 
-builder.Services.AddSession(options =>
-{
-    options.IdleTimeout = TimeSpan.FromHours(24);
-    options.Cookie.HttpOnly = true;
-    options.Cookie.IsEssential = true;
-    options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
-        ? CookieSecurePolicy.SameAsRequest
-        : CookieSecurePolicy.Always;
-    options.Cookie.Name = "AppointmentBooking. Session";
-});
-
+// Cookie Authentication
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
         options.LoginPath = "/Account/Login";
         options.LogoutPath = "/Account/Logout";
         options.AccessDeniedPath = "/Account/AccessDenied";
-        options.Cookie.Name = "AppointmentBooking. Auth";
+        options.Cookie.Name = "AppointmentBooking.Auth";
         options.Cookie.HttpOnly = true;
-        options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
-            ? CookieSecurePolicy.SameAsRequest
+        // Use SameAsRequest for development (allows HTTP), Always for production
+        options.Cookie.SecurePolicy = builder.Environment.IsDevelopment() 
+            ? CookieSecurePolicy.SameAsRequest 
             : CookieSecurePolicy.Always;
         options.Cookie.SameSite = SameSiteMode.Strict;
         options.ExpireTimeSpan = TimeSpan.FromDays(7);
         options.SlidingExpiration = true;
     });
 
-builder.Services.AddTransient<JwtTokenHandler>();
-
+// Register AccessTokenHandler for forwarding auth tokens to API
 builder.Services.AddTransient<AccessTokenHandler>();
 
 // API Base URL configuration
 var apiBaseUrl = builder.Configuration["ApiBaseUrl"] ?? "http://localhost:5000";
 
-builder.Services.AddHttpClient<IAuthApiClient, AuthApiClient>(client =>
-{
-    client.BaseAddress = new Uri(apiBaseUrl);
-    client.DefaultRequestHeaders.Add("Accept", "application/json");
-    client.Timeout = TimeSpan.FromSeconds(30);
-})
-.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
-{
-    ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
-});
-
+// Configure HttpClient for Auth API (login/register)
 builder.Services.AddHttpClient("AuthApi", client =>
 {
     client.BaseAddress = new Uri(apiBaseUrl);
@@ -75,6 +54,7 @@ builder.Services.AddHttpClient("AuthApi", client =>
     ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
 });
 
+// Configure HttpClient for API with access token forwarding
 builder.Services.AddHttpClient("BackendApi", client =>
 {
     client.BaseAddress = new Uri(apiBaseUrl);
@@ -84,9 +64,9 @@ builder.Services.AddHttpClient("BackendApi", client =>
 {
     ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
 })
-.AddHttpMessageHandler<JwtTokenHandler>() 
 .AddHttpMessageHandler<AccessTokenHandler>();
 
+// Register API Client Services
 builder.Services.AddScoped<IApiBranchService>(sp =>
 {
     var factory = sp.GetRequiredService<IHttpClientFactory>();
@@ -133,9 +113,6 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
-
-app.UseSession();
-
 app.UseAuthentication();
 app.UseAuthorization();
 
