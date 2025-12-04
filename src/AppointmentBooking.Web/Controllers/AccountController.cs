@@ -24,7 +24,6 @@ public class AccountController : Controller
     [AllowAnonymous]
     public IActionResult Login(string? returnUrl = null)
     {
-        HttpContext.Session.Clear();
         ViewData["ReturnUrl"] = returnUrl;
         return View();
     }
