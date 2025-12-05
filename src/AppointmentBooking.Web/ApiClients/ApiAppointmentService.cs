@@ -27,7 +27,7 @@ public class ApiAppointmentService : IApiAppointmentService
     {
         try
         {
-            var response = await _httpClient.PostAsJsonAsync("api/appointments", dto);
+            var response = await _httpClient.PostAsJsonAsync("/api/appointments", dto);
             
             if (response.IsSuccessStatusCode)
             {
@@ -50,7 +50,7 @@ public class ApiAppointmentService : IApiAppointmentService
     {
         try
         {
-            return await _httpClient.GetFromJsonAsync<AppointmentDto>($"api/appointments/{id}", JsonOptions);
+            return await _httpClient.GetFromJsonAsync<AppointmentDto>($"/api/appointments/{id}", JsonOptions);
         }
         catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
@@ -68,7 +68,7 @@ public class ApiAppointmentService : IApiAppointmentService
         try
         {
             return await _httpClient.GetFromJsonAsync<AppointmentDto>(
-                $"api/appointments/confirmation/{Uri.EscapeDataString(confirmationCode)}", JsonOptions);
+                $"/api/appointments/confirmation/{Uri.EscapeDataString(confirmationCode)}", JsonOptions);
         }
         catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
@@ -85,7 +85,7 @@ public class ApiAppointmentService : IApiAppointmentService
     {
         try
         {
-            var response = await _httpClient.GetFromJsonAsync<IEnumerable<AppointmentDto>>("api/appointments", JsonOptions);
+            var response = await _httpClient.GetFromJsonAsync<IEnumerable<AppointmentDto>>("/api/appointments", JsonOptions);
             return response ?? Enumerable.Empty<AppointmentDto>();
         }
         catch (Exception ex)
@@ -100,7 +100,7 @@ public class ApiAppointmentService : IApiAppointmentService
         try
         {
             var response = await _httpClient.GetFromJsonAsync<IEnumerable<AppointmentDto>>(
-                $"api/appointments/customer/{Uri.EscapeDataString(email)}", JsonOptions);
+                $"/api/appointments/customer/{Uri.EscapeDataString(email)}", JsonOptions);
             return response ?? Enumerable.Empty<AppointmentDto>();
         }
         catch (Exception ex)
@@ -115,7 +115,7 @@ public class ApiAppointmentService : IApiAppointmentService
         try
         {
             var request = new { Reason = cancellationReason };
-            var response = await _httpClient.PostAsJsonAsync($"api/appointments/{id}/cancel", request);
+            var response = await _httpClient.PostAsJsonAsync($"/api/appointments/{id}/cancel", request);
             return response.IsSuccessStatusCode;
         }
         catch (Exception ex)
@@ -130,7 +130,7 @@ public class ApiAppointmentService : IApiAppointmentService
         try
         {
             var request = new { Status = status };
-            var response = await _httpClient.PatchAsJsonAsync($"api/appointments/{id}/status", request);
+            var response = await _httpClient.PatchAsJsonAsync($"/api/appointments/{id}/status", request);
             return response.IsSuccessStatusCode;
         }
         catch (Exception ex)
@@ -146,7 +146,7 @@ public class ApiAppointmentService : IApiAppointmentService
         try
         {
             var response = await _httpClient.GetFromJsonAsync<IEnumerable<AppointmentDto>>(
-                "api/appointments/my/upcoming", JsonOptions);
+                "/api/appointments/my/upcoming", JsonOptions);
             return response ?? Enumerable.Empty<AppointmentDto>();
         }
         catch (Exception ex)
@@ -161,7 +161,7 @@ public class ApiAppointmentService : IApiAppointmentService
         try
         {
             var response = await _httpClient.GetFromJsonAsync<IEnumerable<AppointmentDto>>(
-                "api/appointments/my/past", JsonOptions);
+                "/api/appointments/my/past", JsonOptions);
             return response ?? Enumerable.Empty<AppointmentDto>();
         }
         catch (Exception ex)
@@ -176,7 +176,7 @@ public class ApiAppointmentService : IApiAppointmentService
         try
         {
             var response = await _httpClient.GetFromJsonAsync<IEnumerable<AppointmentDto>>(
-                $"api/appointments/my/status/{status}", JsonOptions);
+                $"/api/appointments/my/status/{status}", JsonOptions);
             return response ?? Enumerable.Empty<AppointmentDto>();
         }
         catch (Exception ex)
@@ -193,7 +193,7 @@ public class ApiAppointmentService : IApiAppointmentService
             var startDateString = startDate.ToString("yyyy-MM-dd");
             var endDateString = endDate.ToString("yyyy-MM-dd");
             var response = await _httpClient.GetFromJsonAsync<IEnumerable<AppointmentDto>>(
-                $"api/appointments/my?startDate={startDateString}&endDate={endDateString}", JsonOptions);
+                $"/api/appointments/my?startDate={startDateString}&endDate={endDateString}", JsonOptions);
             return response ?? Enumerable.Empty<AppointmentDto>();
         }
         catch (Exception ex)
@@ -209,7 +209,7 @@ public class ApiAppointmentService : IApiAppointmentService
         try
         {
             var response = await _httpClient.GetFromJsonAsync<IEnumerable<AppointmentDto>>(
-                $"api/consultants/{consultantId}/appointments/upcoming", JsonOptions);
+                $"/api/consultants/{consultantId}/appointments/upcoming", JsonOptions);
             return response ?? Enumerable.Empty<AppointmentDto>();
         }
         catch (Exception ex)
@@ -224,7 +224,7 @@ public class ApiAppointmentService : IApiAppointmentService
         try
         {
             var response = await _httpClient.GetFromJsonAsync<IEnumerable<AppointmentDto>>(
-                $"api/consultants/{consultantId}/appointments/past", JsonOptions);
+                $"/api/consultants/{consultantId}/appointments/past", JsonOptions);
             return response ?? Enumerable.Empty<AppointmentDto>();
         }
         catch (Exception ex)
@@ -239,7 +239,7 @@ public class ApiAppointmentService : IApiAppointmentService
         try
         {
             var response = await _httpClient.GetFromJsonAsync<IEnumerable<AppointmentDto>>(
-                $"api/consultants/{consultantId}/appointments/today", JsonOptions);
+                $"/api/consultants/{consultantId}/appointments/today", JsonOptions);
             return response ?? Enumerable.Empty<AppointmentDto>();
         }
         catch (Exception ex)
@@ -256,7 +256,7 @@ public class ApiAppointmentService : IApiAppointmentService
             var startDateString = startDate.ToString("yyyy-MM-dd");
             var endDateString = endDate.ToString("yyyy-MM-dd");
             var response = await _httpClient.GetFromJsonAsync<IEnumerable<AppointmentDto>>(
-                $"api/consultants/{consultantId}/appointments?startDate={startDateString}&endDate={endDateString}", JsonOptions);
+                $"/api/consultants/{consultantId}/appointments?startDate={startDateString}&endDate={endDateString}", JsonOptions);
             return response ?? Enumerable.Empty<AppointmentDto>();
         }
         catch (Exception ex)

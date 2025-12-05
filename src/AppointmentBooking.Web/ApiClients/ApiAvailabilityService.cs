@@ -23,7 +23,7 @@ public class ApiAvailabilityService : IApiAvailabilityService
         {
             var dateString = date.ToString("yyyy-MM-dd");
             var response = await _httpClient.GetFromJsonAsync<IEnumerable<AvailableSlotDto>>(
-                $"api/branches/{branchId}/availability?serviceId={serviceId}&date={dateString}");
+                $"/api/branches/{branchId}/availability?serviceId={serviceId}&date={dateString}");
             return response ?? Enumerable.Empty<AvailableSlotDto>();
         }
         catch (Exception ex)
@@ -39,7 +39,7 @@ public class ApiAvailabilityService : IApiAvailabilityService
         try
         {
             var response = await _httpClient.GetFromJsonAsync<IEnumerable<DateTime>>(
-                $"api/branches/{branchId}/available-dates?daysAhead={daysAhead}");
+                $"/api/branches/{branchId}/available-dates?daysAhead={daysAhead}");
             return response ?? Enumerable.Empty<DateTime>();
         }
         catch (Exception ex)

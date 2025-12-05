@@ -21,7 +21,7 @@ public class ApiConsultantService : IApiConsultantService
     {
         try
         {
-            return await _httpClient.GetFromJsonAsync<ConsultantDto>($"api/consultants/{id}");
+            return await _httpClient.GetFromJsonAsync<ConsultantDto>($"/api/consultants/{id}");
         }
         catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
@@ -38,7 +38,7 @@ public class ApiConsultantService : IApiConsultantService
     {
         try
         {
-            return await _httpClient.GetFromJsonAsync<ConsultantDto>($"api/consultants/user/{userId}");
+            return await _httpClient.GetFromJsonAsync<ConsultantDto>($"/api/consultants/user/{userId}");
         }
         catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
@@ -55,7 +55,7 @@ public class ApiConsultantService : IApiConsultantService
     {
         try
         {
-            var response = await _httpClient.GetFromJsonAsync<IEnumerable<ConsultantDto>>("api/consultants");
+            var response = await _httpClient.GetFromJsonAsync<IEnumerable<ConsultantDto>>("/api/consultants");
             return response ?? Enumerable.Empty<ConsultantDto>();
         }
         catch (Exception ex)
@@ -70,7 +70,7 @@ public class ApiConsultantService : IApiConsultantService
         try
         {
             var response = await _httpClient.GetFromJsonAsync<IEnumerable<ConsultantDto>>(
-                $"api/consultants/branch/{branchId}");
+                $"/api/consultants/branch/{branchId}");
             return response ?? Enumerable.Empty<ConsultantDto>();
         }
         catch (Exception ex)
@@ -86,7 +86,7 @@ public class ApiConsultantService : IApiConsultantService
         {
             var dateString = date.ToString("yyyy-MM-dd");
             return await _httpClient.GetFromJsonAsync<ConsultantScheduleDto>(
-                $"api/consultants/{consultantId}/schedule?date={dateString}");
+                $"/api/consultants/{consultantId}/schedule?date={dateString}");
         }
         catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
@@ -104,7 +104,7 @@ public class ApiConsultantService : IApiConsultantService
     {
         try
         {
-            var response = await _httpClient.PostAsJsonAsync("api/consultants/register", dto);
+            var response = await _httpClient.PostAsJsonAsync("/api/consultants/register", dto);
             
             if (response.IsSuccessStatusCode)
             {
@@ -139,7 +139,7 @@ public class ApiConsultantService : IApiConsultantService
         try
         {
             var response = await _httpClient.GetFromJsonAsync<IEnumerable<PendingConsultantDto>>(
-                "api/consultants/pending");
+                "/api/consultants/pending");
             return response ?? Enumerable.Empty<PendingConsultantDto>();
         }
         catch (Exception ex)
@@ -153,7 +153,7 @@ public class ApiConsultantService : IApiConsultantService
     {
         try
         {
-            var response = await _httpClient.PostAsync($"api/consultants/{consultantId}/activate", null);
+            var response = await _httpClient.PostAsync($"/api/consultants/{consultantId}/activate", null);
             return response.IsSuccessStatusCode;
         }
         catch (Exception ex)
@@ -167,7 +167,7 @@ public class ApiConsultantService : IApiConsultantService
     {
         try
         {
-            var response = await _httpClient.PostAsync($"api/consultants/{consultantId}/reject", null);
+            var response = await _httpClient.PostAsync($"/api/consultants/{consultantId}/reject", null);
             return response.IsSuccessStatusCode;
         }
         catch (Exception ex)
