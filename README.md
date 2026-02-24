@@ -347,14 +347,6 @@ The `AccessTokenHandler` automatically handles token refresh:
 }
 ```
 
-### Secure Cookie Requirements
-
-For production deployments:
-
-- **HTTPS Required**: Cookies are configured with `Secure` flag, requiring HTTPS
-- **SameSite=Strict**: Prevents CSRF attacks by not sending cookies on cross-site requests
-- **HttpOnly**: Prevents JavaScript access to tokens, mitigating XSS attacks
-
 ### Environment Variables
 
 Configure the following for production:
@@ -370,11 +362,4 @@ Configure the following for production:
 2. Update `appsettings.json` or set environment variables
 3. Run the web application
 
-### Security Recommendations
 
-1. **Always use HTTPS** in production
-2. **Set strong JWT keys** via environment variables
-3. **Configure proper CORS** policies on the API
-4. **Enable HSTS** (HTTP Strict Transport Security)
-5. **Rotate refresh tokens** on each use
-6. **Set appropriate token expiry** times based on security requirements
