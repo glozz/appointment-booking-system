@@ -21,7 +21,7 @@ public class ApiServiceService : IApiServiceService
     {
         try
         {
-            var response = await _httpClient.GetFromJsonAsync<IEnumerable<ServiceDto>>("api/services");
+            var response = await _httpClient.GetFromJsonAsync<IEnumerable<ServiceDto>>("/api/services");
             return response ?? Enumerable.Empty<ServiceDto>();
         }
         catch (Exception ex)
@@ -35,7 +35,7 @@ public class ApiServiceService : IApiServiceService
     {
         try
         {
-            var response = await _httpClient.GetFromJsonAsync<IEnumerable<ServiceDto>>("api/services/active");
+            var response = await _httpClient.GetFromJsonAsync<IEnumerable<ServiceDto>>("/api/services/active");
             return response ?? Enumerable.Empty<ServiceDto>();
         }
         catch (Exception ex)
@@ -49,7 +49,7 @@ public class ApiServiceService : IApiServiceService
     {
         try
         {
-            return await _httpClient.GetFromJsonAsync<ServiceDto>($"api/services/{id}");
+            return await _httpClient.GetFromJsonAsync<ServiceDto>($"/api/services/{id}");
         }
         catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {

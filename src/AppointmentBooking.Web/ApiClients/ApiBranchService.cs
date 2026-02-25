@@ -21,7 +21,7 @@ public class ApiBranchService : IApiBranchService
     {
         try
         {
-            var response = await _httpClient.GetFromJsonAsync<IEnumerable<BranchDto>>("api/branches");
+            var response = await _httpClient.GetFromJsonAsync<IEnumerable<BranchDto>>("/api/branches");
             return response ?? Enumerable.Empty<BranchDto>();
         }
         catch (Exception ex)
@@ -35,7 +35,7 @@ public class ApiBranchService : IApiBranchService
     {
         try
         {
-            var response = await _httpClient.GetFromJsonAsync<IEnumerable<BranchDto>>("api/branches/active");
+            var response = await _httpClient.GetFromJsonAsync<IEnumerable<BranchDto>>("/api/branches/active");
             return response ?? Enumerable.Empty<BranchDto>();
         }
         catch (Exception ex)
@@ -49,7 +49,7 @@ public class ApiBranchService : IApiBranchService
     {
         try
         {
-            return await _httpClient.GetFromJsonAsync<BranchDto>($"api/branches/{id}");
+            return await _httpClient.GetFromJsonAsync<BranchDto>($"/api/branches/{id}");
         }
         catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
